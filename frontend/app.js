@@ -424,6 +424,12 @@
         if (box) box.className = "feedback status-stop";
         const msgEl = document.getElementById("feedbackText");
         if (msgEl) msgEl.textContent = verdict.message;
+        if (voiceEnabled) {
+          const stopVoiceText = (sessionMode === "sim_small")
+            ? "Timing irregularities detected. Your breathing drifted off rhythm. Focus on pacing each phase steadily with the circle."
+            : "Practice stopped. Your breathing was out of phase with the guide. Please relax, reset, and follow the visual guide from the start.";
+          playSpokenOverview(stopVoiceText);
+        }
       },
       onReview: (reviewText) => {
         const reviewEl = document.getElementById("finalReviewText");
@@ -999,20 +1005,69 @@
     const idealRatio = `1 : ${parseFloat(idHld)} : ${parseFloat(idExh)} : 0`;
     const measuredRatio = `1 : ${idHld} : ${idExh}`;
 
+    if (sessionMode === "sim_wrong") {
+      return {
+        cycle_num: cycleNum,
+        headline: "Critical Timing Deviation: Breathing Out of Phase with Guide",
+        summary_text: `You completed cycle ${cycleNum} of ${pName} with critical phase desynchronization (Score: 28/100, Grade D). Your breath is inverted relative to the visual guide.`,
+        spoken_text: "Needs practice. Critical timing deviation detected. Your breath is out of phase with the guide. Please synchronize with the visual circle.",
+        audio_url: `/tts?text=${encodeURIComponent("Needs practice. Critical timing deviation detected. Your breath is out of phase with the guide. Please synchronize with the visual circle.")}&voice=en-IN-NeerjaNeural`,
+        score: 28.0,
+        grade: "Grade D",
+        parameters: [
+          { name: "1. Inhale : Hold : Exhale", measured: "Reversed (Exhale on Inhale)", ideal: idealRatio, assessment: "CRITICAL DESYNC", status_cls: "alert" },
+          { name: "2. Respiratory Rate", measured: `${bpm} BPM`, ideal: `${bpm} BPM`, assessment: "OFF TARGET", status_cls: "alert" },
+          { name: "3. Tidal Volume (Vt)", measured: "310 mL", ideal: "1100 mL", assessment: "SHALLOW", status_cls: "alert" },
+          { name: "4. Peak Expiratory Flow", measured: "85 mL/s", ideal: "Smooth / Controlled", assessment: "ERRATIC", status_cls: "alert" },
+          { name: "5. Endurance Duration", measured: `${Math.round(currentTime() || totalCycle * cycleNum)} s`, ideal: "Full Session", assessment: "DESYNC", status_cls: "alert" },
+          { name: "Overall DTW Match Score", measured: "28% (Grade D)", ideal: ">= 80% (Mastery)", assessment: "FAILED", status_cls: "alert" }
+        ],
+        recommendations: [
+          "Your breathing is completely inverted or out of sync with the visual circle.",
+          "Inhale when the circle expands, and exhale smoothly when the circle contracts."
+        ]
+      };
+    }
+
+    if (sessionMode === "sim_small") {
+      return {
+        cycle_num: cycleNum,
+        headline: "Timing Irregularities Detected — Inconsistent Rhythm",
+        summary_text: `You completed cycle ${cycleNum} of ${pName} with minor timing and ratio irregularities (Score: 62/100, Grade C). Measured ratio deviated from ideal.`,
+        spoken_text: "Timing irregularities detected. Your breathing drifted off rhythm. Focus on pacing each phase steadily with the circle.",
+        audio_url: `/tts?text=${encodeURIComponent("Timing irregularities detected. Your breathing drifted off rhythm. Focus on pacing each phase steadily with the circle.")}&voice=en-IN-NeerjaNeural`,
+        score: 62.0,
+        grade: "Grade C",
+        parameters: [
+          { name: "1. Inhale : Hold : Exhale", measured: `1 : ${(hld*0.5/inh).toFixed(2)} : ${(exh*0.65/inh).toFixed(2)}`, ideal: idealRatio, assessment: "OFF TARGET", status_cls: "alert" },
+          { name: "2. Respiratory Rate", measured: `${bpm} BPM`, ideal: `${bpm} BPM`, assessment: "VARIABLE", status_cls: "alert" },
+          { name: "3. Tidal Volume (Vt)", measured: "480 mL", ideal: "1100 mL", assessment: "SUBOPTIMAL", status_cls: "alert" },
+          { name: "4. Peak Expiratory Flow", measured: "110 mL/s", ideal: "Smooth / Controlled", assessment: "UNEVEN", status_cls: "alert" },
+          { name: "5. Endurance Duration", measured: `${Math.round(currentTime() || totalCycle * cycleNum)} s`, ideal: "Full Session", assessment: "SUSTAINED", status_cls: "match" },
+          { name: "Overall DTW Match Score", measured: "62% (Grade C)", ideal: ">= 80% (Mastery)", assessment: "FAIR", status_cls: "alert" }
+        ],
+        recommendations: [
+          "Phase ratio was inconsistent due to shortened retention and lingering at the bottom.",
+          "Maintain smooth, even transitions between inhalation and exhalation without pausing early."
+        ]
+      };
+    }
+
     return {
       cycle_num: cycleNum,
       headline: "Well Done! Solid adherence and rhythm throughout the cycle.",
-      summary_text: `You completed cycle ${cycleNum} of ${pName} with an overall mastery score of 82/100 (Grade A). Measured ratio was ${measuredRatio} at ${bpm} BPM (target ${bpm} BPM).`,
-      spoken_text: `Cycle ${cycleNum} complete. Overall score 82 percent, Grade A. Your breath ratio was 1 to ${Math.round(hld / inh)} to ${Math.round(exh / inh)}, at ${Math.round(bpm)} breaths per minute. Maintain this calm rhythm.`,
-      score: 82.0,
+      summary_text: `You completed cycle ${cycleNum} of ${pName} with an overall mastery score of 88/100 (Grade A). Measured ratio was ${measuredRatio} at ${bpm} BPM (target ${bpm} BPM).`,
+      spoken_text: "Cycle complete. Grade A, excellent rhythm. Maintain this calm diaphragmatic focus.",
+      audio_url: `/tts?text=${encodeURIComponent("Cycle complete. Grade A, excellent rhythm. Maintain this calm diaphragmatic focus.")}&voice=en-IN-NeerjaNeural`,
+      score: 88.0,
       grade: "Grade A",
       parameters: [
         { name: "1. Inhale : Hold : Exhale", measured: measuredRatio, ideal: idealRatio, assessment: "EXCELLENT MATCH", status_cls: "match" },
         { name: "2. Respiratory Rate", measured: `${bpm} BPM`, ideal: `${bpm} BPM`, assessment: "ON TARGET", status_cls: "match" },
-        { name: "3. Tidal Volume (Vt)", measured: "420 mL", ideal: "1100 mL", assessment: "GOOD DEPTH", status_cls: "match" },
+        { name: "3. Tidal Volume (Vt)", measured: "620 mL", ideal: "1100 mL", assessment: "GOOD DEPTH", status_cls: "match" },
         { name: "4. Peak Expiratory Flow", measured: "140 mL/s", ideal: "Smooth / Controlled", assessment: "STABLE", status_cls: "match" },
         { name: "5. Endurance Duration", measured: `${Math.round(currentTime() || totalCycle * cycleNum)} s`, ideal: "Full Session", assessment: "SUSTAINED", status_cls: "match" },
-        { name: "Overall DTW Match Score", measured: "82% (Grade A)", ideal: ">= 80% (Mastery)", assessment: "PASSED", status_cls: "match" }
+        { name: "Overall DTW Match Score", measured: "88% (Grade A)", ideal: ">= 80% (Mastery)", assessment: "PASSED", status_cls: "match" }
       ],
       recommendations: [
         selected && selected.cue ? selected.cue : "Maintain smooth, continuous diaphragmatic engagement.",
@@ -1093,22 +1148,58 @@
         const dur = Math.round(currentTime()) || 15;
         const period = selected && selected.segments ? selected.segments.reduce((a, s) => a + s[1], 0) || 1 : 1;
         const cyc = Math.max(1, Math.floor(dur / period) || 1);
-        fin = {
-          pattern_name: pName,
-          headline: `Session Completed with Mastery!`,
-          duration_s: dur,
-          n_cycles_found: cyc,
-          session_score: 86.0,
-          grade: "Grade A",
-          tempo_ratio: 1.0,
-          cycle_scores: [88, 86, 85, 84],
-          recommendations: [
-            selected && selected.cue ? selected.cue : "Maintain smooth, continuous diaphragmatic engagement.",
-            "Great endurance and calm pacing throughout this practice."
-          ],
-          spoken_text: `Session complete! You completed ${cyc} cycles of ${pName} with an overall mastery score of 86 percent, Grade A. Excellent practice!`,
-          audio_url: `/tts?text=${encodeURIComponent(`Session complete! You completed ${cyc} cycles of ${pName} with an overall mastery score of 86 percent, Grade A. Excellent practice!`)}&voice=en-IN-NeerjaNeural`
-        };
+        if (sessionMode === "sim_wrong") {
+          fin = {
+            pattern_name: pName,
+            headline: "Session Stopped — Severe Timing Deviation",
+            duration_s: dur,
+            n_cycles_found: cyc,
+            session_score: 32.0,
+            grade: "Grade D",
+            tempo_ratio: 0.5,
+            cycle_scores: [30, 34],
+            recommendations: [
+              "Your breathing was completely out of phase with the visual guide.",
+              "Take a moment to relax, reset, and synchronize with the circle from the start."
+            ],
+            spoken_text: "Practice stopped. Your breathing was out of phase with the guide. Please relax, reset, and follow the visual guide from the start.",
+            audio_url: `/tts?text=${encodeURIComponent("Practice stopped. Your breathing was out of phase with the guide. Please relax, reset, and follow the visual guide from the start.")}&voice=en-IN-NeerjaNeural`
+          };
+        } else if (sessionMode === "sim_small") {
+          fin = {
+            pattern_name: pName,
+            headline: "Session Completed with Timing Irregularities",
+            duration_s: dur,
+            n_cycles_found: cyc,
+            session_score: 64.0,
+            grade: "Grade C",
+            tempo_ratio: 0.85,
+            cycle_scores: [66, 62],
+            recommendations: [
+              "Timing inconsistencies and irregular phase holds were detected.",
+              "Focus on matching the circle expansion and contraction steadily."
+            ],
+            spoken_text: "Session complete. Timing irregularities were detected during your practice. Focus on pacing each breath steadily with the guide in your next session.",
+            audio_url: `/tts?text=${encodeURIComponent("Session complete. Timing irregularities were detected during your practice. Focus on pacing each breath steadily with the guide in your next session.")}&voice=en-IN-NeerjaNeural`
+          };
+        } else {
+          fin = {
+            pattern_name: pName,
+            headline: "Session Completed with Mastery!",
+            duration_s: dur,
+            n_cycles_found: cyc,
+            session_score: 86.0,
+            grade: "Grade A",
+            tempo_ratio: 1.0,
+            cycle_scores: [88, 86, 85, 84],
+            recommendations: [
+              selected && selected.cue ? selected.cue : "Maintain smooth, continuous diaphragmatic engagement.",
+              "Great endurance and calm pacing throughout this practice."
+            ],
+            spoken_text: "Session complete! Outstanding practice with solid rhythm and mastery. Great work!",
+            audio_url: `/tts?text=${encodeURIComponent("Session complete! Outstanding practice with solid rhythm and mastery. Great work!")}&voice=en-IN-NeerjaNeural`
+          };
+        }
       }
 
       // Populate summary stats

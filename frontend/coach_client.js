@@ -70,10 +70,14 @@
         "Cycle complete. Grade B, steady breathing. Keep your exhalations smooth and controlled.",
         "Cycle complete. Fair attempt. Focus on pacing each phase closely with the guide.",
         "Cycle complete. Align your breath closely with the circle animation. Savor each breath.",
+        "Needs practice. Critical timing deviation detected. Your breath is out of phase with the guide. Please synchronize with the visual circle.",
+        "Timing irregularities detected. Your breathing drifted off rhythm. Focus on pacing each phase steadily with the circle.",
         "Session complete! Outstanding practice with solid rhythm and mastery. Great work!",
         "Session complete! Well done, you maintained good consistency throughout the practice.",
         "Session complete. Thank you for practicing. Consistency will bring deeper breath control.",
         "Session complete. Good effort today. Follow the visual circle closely in your next session.",
+        "Practice stopped. Your breathing was out of phase with the guide. Please relax, reset, and follow the visual guide from the start.",
+        "Session complete. Timing irregularities were detected during your practice. Focus on pacing each breath steadily with the guide in your next session.",
       ];
       this._audioBank = {};
       phrases.forEach((txt) => {
@@ -188,8 +192,8 @@
     _handle(res) {
       if (res.status === "warming_up" || !res.message) return;
       this.onMessage(res);
-      if (res.speak) {
-        this.say(res.message, res.stop_session);
+      if (res.speak && !res.stop_session) {
+        this.say(res.message);
       }
       if (res.stop_session) {
         this.stopped = true;
@@ -284,7 +288,7 @@
         return;
       }
 
-      const fullUrl = audioUrl || ((this.apiBase || "") + "/tts?text=" + encodeURIComponent(clean) + "&voice=" + encodeURIComponent(this.voice.neuralVoice || "en-IN-NeerjaNeural"));
+      const fullUrl = (typeof audioUrl === "string" && audioUrl) ? audioUrl : ((this.apiBase || "") + "/tts?text=" + encodeURIComponent(clean) + "&voice=" + encodeURIComponent(this.voice.neuralVoice || "en-IN-NeerjaNeural"));
 
       const audio = new Audio();
       this._currentAudio = audio;

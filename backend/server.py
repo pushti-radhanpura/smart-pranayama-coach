@@ -243,6 +243,7 @@ def compare(req: CompareRequest):
 
 
 @app.post("/cycle-review")
+@app.post("/cycle_review")
 async def cycle_review(req: CycleReviewRequest):
     res = await run_in_threadpool(svc.cycle_review, req.pattern, req.cycle_num, req.t, req.values)
     if isinstance(res, dict) and res.get("spoken_text"):

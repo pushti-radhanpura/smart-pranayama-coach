@@ -109,6 +109,14 @@ def finish_session(session_id: str, pattern: str, t, values) -> dict:
     res = dtw.analyse_session(x, p, fs=fs)
     S = res["summary"]
     cycles = res["cycles"]
+    if not cycles and len(x) >= int(0.6 * p.cycle_s * fs):
+        try:
+            ideal_cyc, bnds = dtw.aligned_cycle(p, fs)
+            c_seg = x[:int(p.cycle_s * fs)] if len(x) >= int(p.cycle_s * fs) else x
+            rc = dtw.analyse_cycle(0, 0.0, c_seg, ideal_cyc, bnds, p, fs, 0.15)
+            cycles = [rc]
+        except Exception:
+            pass
     scores = [round(float(c.score), 1) for c in cycles]
 
     n_cycles = max(1, int(S.get("n_cycles_found", len(scores)) or 1))
@@ -116,41 +124,76 @@ def finish_session(session_id: str, pattern: str, t, values) -> dict:
     tempo_ratio = round(float(S.get("median_tempo_ratio", 1.0)), 2)
     duration_s = int(round(dur)) if dur > 0 else int(round(p.cycle_s * n_cycles))
 
-    if session_score >= 80:
+    # Guide clock synchronization
+    cyc_ref = dtw.one_cycle(p, fs)
+    idx_ref = (int(round(t[0] * fs)) + np.arange(len(x))) % len(cyc_ref)
+    g = dtw.znorm(cyc_ref[idx_ref])
+    corr_guide = float(np.corrcoef(x, g)[0, 1]) if len(x) == len(g) and np.std(x) > 1e-4 and np.std(g) > 1e-4 else 0.5
+
+    id_inh = max(0.2, p.inhale)
+    id_hld = p.hold_in / id_inh
+    id_exh = p.exhale / id_inh
+    id_hld2 = p.hold_out / id_inh
+
+    ratio_errs = []
+    for c in cycles:
+        u = getattr(c, "phases", {}).get("user", {})
+        if u:
+            u_inh = max(0.2, u.get("inhale", p.inhale))
+            u_hld = u.get("hold_in", 0.0) / u_inh
+            u_exh = u.get("exhale", p.exhale) / u_inh
+            u_hld2 = u.get("hold_out", 0.0) / u_inh
+            err = abs(u_hld - id_hld) + abs(u_exh - id_exh) + abs(u_hld2 - id_hld2)
+            ratio_errs.append(err)
+    mean_ratio_err = float(np.mean(ratio_errs)) if ratio_errs else 0.0
+
+    was_stopped = False
+    with _lock:
+        held = _sessions.pop(session_id, None)
+        if held and hasattr(held[1], "_last_status") and held[1]._last_status == "stop":
+            was_stopped = True
+
+    if was_stopped or corr_guide < 0.2:
+        session_score = round(float(np.clip(25.0 + 15.0 * max(-1.0, corr_guide), 18.0, 45.0)), 1)
+        grade = "Grade D"
+        headline = "Session Interrupted — Severe Timing Deviation"
+        review_text = (
+            f"Session stopped after {n_cycles} breath cycles of {p.name}. "
+            f"Severe timing deviation detected (Score: {session_score}/100, {grade}). "
+            f"Your breathing was out of phase with the visual guide."
+        )
+        spoken_text = "Practice stopped. Your breathing was out of phase with the guide. Please relax, reset, and follow the visual guide from the start."
+        recs = [
+            "Your breathing was inverted or completely out of phase with the visual guide.",
+            "Take a moment to relax, reset, and follow the circle expansion and contraction from the start."
+        ]
+    elif corr_guide < 0.50 or mean_ratio_err >= 0.20 or any(sc < 78 for sc in scores) or tempo_ratio < 0.88 or tempo_ratio > 1.12:
+        raw_s = min(float(S.get("session_score", 70.0)), float(np.mean(scores)) if scores else 70.0)
+        session_score = round(float(np.clip(raw_s * 0.78, 54.0, 68.0)), 1)
+        grade = "Grade C" if session_score < 65 else "Grade B"
+        headline = "Session Completed with Timing Irregularities"
+        review_text = (
+            f"You completed {n_cycles} breath cycles of {p.name} across {duration_s} seconds. "
+            f"Timing irregularities detected (Score: {session_score}/100, {grade})."
+        )
+        spoken_text = "Session complete. Timing irregularities were detected during your practice. Focus on pacing each breath steadily with the guide in your next session."
+        recs = [
+            "Timing inconsistencies were detected across your breath cycles.",
+            "Focus on matching the circle expansion and contraction steadily."
+        ]
+    else:
+        session_score = round(float(np.clip(S.get("session_score", 85.0), 82.0, 96.0)), 1)
         grade = "Grade A"
         headline = "Session Completed with Mastery!"
-        closing_advice = "Your pacing and breath alignment were excellent."
-    elif session_score >= 70:
-        grade = "Grade B"
-        headline = "Session Completed — Solid Progress!"
-        closing_advice = "Good consistency with minor tempo variations."
-    elif session_score >= 50:
-        grade = "Grade C"
-        headline = "Session Completed — Keep Practicing!"
-        closing_advice = "Focus on sustaining steady inhalation and exhalation rhythm."
-    else:
-        grade = "Grade D"
-        headline = "Session Completed"
-        closing_advice = "Follow the circle guide closely to synchronize your breath."
-
-    recs = []
-    if tempo_ratio > 1.2:
-        recs.append(f"Your pace was about {int((tempo_ratio - 1) * 100)}% slower than recommended. Aim for {round(60.0 / p.cycle_s, 1)} BPM.")
-    elif tempo_ratio < 0.8:
-        recs.append(f"Your pace was about {int((1 - tempo_ratio) * 100)}% faster than recommended. Savor each breath.")
-    if p.cue:
-        recs.append(p.cue)
-    if not recs:
-        recs.append("Maintain this regular daily rhythm for best mindfulness and respiratory benefits.")
-
-    if session_score >= 80:
+        review_text = (
+            f"You completed {n_cycles} breath cycles of {p.name} across {duration_s} seconds with excellent rhythm. "
+            f"Overall session mastery score was {session_score}/100 ({grade})."
+        )
         spoken_text = "Session complete! Outstanding practice with solid rhythm and mastery. Great work!"
-    elif session_score >= 70:
-        spoken_text = "Session complete! Well done, you maintained good consistency throughout the practice."
-    elif session_score >= 50:
-        spoken_text = "Session complete. Thank you for practicing. Consistency will bring deeper breath control."
-    else:
-        spoken_text = "Session complete. Good effort today. Follow the visual circle closely in your next session."
+        recs = [
+            "Your pacing and breath alignment were excellent throughout.",
+            p.cue if p.cue else "Maintain this regular daily rhythm for best respiratory benefits."
+        ]
 
     import urllib.parse
     return {
@@ -164,10 +207,7 @@ def finish_session(session_id: str, pattern: str, t, values) -> dict:
         "tempo_ratio": tempo_ratio,
         "cycle_scores": scores if scores else [session_score],
         "recommendations": recs,
-        "review_text": (
-            f"You finished {n_cycles} breath cycles of {p.name} across {duration_s} seconds. "
-            f"Overall session mastery score was {session_score}/100 ({grade})."
-        ),
+        "review_text": review_text,
         "spoken_text": spoken_text,
         "audio_url": f"/tts?text={urllib.parse.quote(spoken_text)}&voice=en-IN-NeerjaNeural",
     }
@@ -298,42 +338,20 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
     measured_bpm = round(60.0 / cyc_dur, 1)
     ideal_bpm = round(60.0 / p.cycle_s, 1)
 
-    # 2. Genuine phase measurements from the extracted cycle segment
-    lo_c, hi_c = float(np.min(cyc)), float(np.max(cyc))
-    rng_c = max(1e-4, hi_c - lo_c)
-    norm_c = (cyc - lo_c) / rng_c
-
-    hi_idx = np.where(norm_c >= 0.80)[0]
-    if len(hi_idx) > 0:
-        first_top = hi_idx[0]
-        dn_idx = np.where(norm_c[first_top:] < 0.75)[0]
-        last_top = first_top + dn_idx[0] if len(dn_idx) > 0 else len(norm_c) - 1
-        lo_idx = np.where(norm_c[last_top:] <= 0.20)[0]
-        first_bot = last_top + lo_idx[0] if len(lo_idx) > 0 else len(norm_c) - 1
-
-        measured_inh = float(max(0.5, first_top / fs))
-        measured_hld = float(max(0.0, (last_top - first_top) / fs))
-        measured_exh = float(max(0.5, (first_bot - last_top) / fs))
-        measured_hld_out = float(max(0.0, (len(norm_c) - 1 - first_bot) / fs))
-    else:
+    # 2. Genuine phase measurements via constrained DTW analysis
+    try:
+        res_cyc = dtw.analyse_cycle(0, 0.0, cyc, ideal_cycle, bounds, p, fs, 0.15)
+        u_ph = res_cyc.phases.get("user", {})
+        measured_inh = float(max(0.4, u_ph.get("inhale", p.inhale)))
+        measured_hld = float(max(0.0, u_ph.get("hold_in", p.hold_in)))
+        measured_exh = float(max(0.4, u_ph.get("exhale", p.exhale)))
+        measured_hld_out = float(max(0.0, u_ph.get("hold_out", p.hold_out)))
+        dtw_score = float(res_cyc.score)
+    except Exception:
         measured_inh = float(0.5 * cyc_dur)
         measured_hld = 0.0
         measured_exh = float(0.5 * cyc_dur)
         measured_hld_out = 0.0
-
-    # 3. True Sakoe-Chiba DTW banded alignment
-    L = len(ideal_cycle)
-    if len(cyc) >= 4:
-        u = np.interp(np.linspace(0, len(cyc) - 1, L), np.arange(len(cyc)), cyc)
-        u_z = dtw.znorm(u)
-        ref_z = dtw.znorm(ideal_cycle)
-        radius = max(2, int(round(0.20 * L)))
-        d, pu, pi, _ = dtw.dtw_banded(u_z, ref_z, radius)
-        shape_score = 100.0 * np.exp(-d / 0.32)
-        tempo_ratio = cyc_dur / p.cycle_s
-        tempo_score = 100.0 * np.exp(-abs(np.log(max(0.2, tempo_ratio))) / 0.22)
-        dtw_score = float(np.clip(0.70 * shape_score + 0.30 * tempo_score, 15.0, 98.0))
-    else:
         dtw_score = 75.0
 
     score = round(dtw_score, 1)
@@ -366,93 +384,58 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
     else:
         ideal_ratio_str = f"1 : {id_hld:g} : {id_exh:g}"
 
-    # Performance Assessments
-    if score >= 80:
+    # Direct guide clock synchronization
+    cyc_ref = dtw.one_cycle(p, fs)
+    idx_ref = (int(round(t[0] * fs)) + np.arange(len(x))) % len(cyc_ref)
+    g = dtw.znorm(cyc_ref[idx_ref])
+    corr_guide = float(np.corrcoef(x, g)[0, 1]) if len(x) == len(g) and np.std(x) > 1e-4 and np.std(g) > 1e-4 else 0.5
+    ratio_err = abs(exh_ratio - id_exh) + abs(hld_ratio - id_hld) + abs(hld_out_ratio - id_hld_out)
+
+    # Performance Assessments & Calibration
+    if corr_guide < 0.2:
+        # Out of phase / reversed breathing
+        score = round(float(np.clip(25.0 + 15.0 * max(-1.0, corr_guide), 18.0, 45.0)), 1)
+        grade = "Grade D"
+        score_assessment = "FAILED (OUT OF PHASE)"
+        headline = "Critical Timing Deviation: Breathing Out of Phase with Guide"
+        ratio_assessment = "CRITICAL DESYNC"
+        rate_assessment = "OFF TARGET"
+        spoken_text = "Needs practice. Critical timing deviation detected. Your breath is out of phase with the guide. Please synchronize with the visual circle."
+        recs = [
+            "Your breathing is completely inverted or out of sync with the visual circle guide.",
+            "Inhale when the circle expands, and exhale smoothly when the circle contracts."
+        ]
+    elif corr_guide < 0.50 or ratio_err > 0.18 or dtw_score < 78.0:
+        # Small mistakes / timing irregularities / ratio drift
+        score = round(float(np.clip(min(dtw_score, 68.0), 55.0, 68.0)), 1)
+        grade = "Grade C" if score < 65 else "Grade B"
+        score_assessment = "FAIR" if grade == "Grade C" else "GOOD"
+        headline = "Timing Irregularities Detected — Inconsistent Rhythm"
+        ratio_assessment = "OFF TARGET" if ratio_err > 0.35 else "GOOD MATCH"
+        rate_assessment = "ON TARGET" if abs(measured_bpm - ideal_bpm) <= 1.0 else ("TOO FAST" if measured_bpm > ideal_bpm else "TOO SLOW")
+        spoken_text = "Timing irregularities detected. Your breathing drifted off rhythm. Focus on pacing each phase steadily with the circle."
+        recs = [
+            f"Breath ratio was inconsistent ({measured_ratio_str} vs ideal {ideal_ratio_str}).",
+            "Maintain smooth, even transitions between inhalation and exhalation without lingering."
+        ]
+    else:
+        # Clean breathing / follows well
+        score = round(float(np.clip(dtw_score, 82.0, 96.0)), 1)
         grade = "Grade A"
         score_assessment = "PASSED"
         headline = "Well Done! Solid adherence and rhythm throughout the cycle."
-    elif score >= 70:
-        grade = "Grade B"
-        score_assessment = "GOOD"
-        headline = "Good work! Steady breathing with minor timing adjustments needed."
-    elif score >= 50:
-        grade = "Grade C"
-        score_assessment = "FAIR"
-        headline = "Fair attempt. Focus on pacing each phase with the guide."
-    else:
-        grade = "Grade D"
-        score_assessment = "NEEDS PRACTICE"
-        headline = "Needs practice. Align your breath closely with the circle animation."
-
-    ratio_err = abs(exh_ratio - id_exh) + abs(hld_ratio - id_hld)
-    if ratio_err <= 0.40:
         ratio_assessment = "EXCELLENT MATCH"
-    elif ratio_err <= 0.85:
-        ratio_assessment = "GOOD MATCH"
-    else:
-        ratio_assessment = "OFF TARGET"
+        rate_assessment = "ON TARGET"
+        spoken_text = "Cycle complete. Grade A, excellent rhythm. Maintain this calm diaphragmatic focus."
+        recs = [
+            "Maintain this exact calm rhythm and diaphragmatic focus.",
+            p.cue if p.cue else "Keep shoulders relaxed and posture upright."
+        ]
 
     bpm_diff = abs(measured_bpm - ideal_bpm)
-    if bpm_diff <= 1.0:
-        rate_assessment = "ON TARGET"
-    elif measured_bpm > ideal_bpm:
-        rate_assessment = "TOO FAST"
-    else:
-        rate_assessment = "TOO SLOW"
-
     vt_assessment = "GOOD DEPTH" if 250 <= vt_ml <= 850 else ("SHALLOW" if vt_ml < 250 else "DEEP")
     pef_assessment = "STABLE"
     endurance_assessment = "SUSTAINED"
-
-    # Actionable coaching recommendations
-    recs = []
-    if measured_inh > p.inhale * 1.30:
-        recs.append(f"Shorten your inhalation slightly towards ~{p.inhale:g}s (currently {measured_inh:.1f}s).")
-    elif measured_inh < p.inhale * 0.70:
-        recs.append(f"Lengthen your inhalation gently towards ~{p.inhale:g}s (currently {measured_inh:.1f}s).")
-
-    if p.hold_in > 0 and measured_hld < p.hold_in * 0.70:
-        recs.append(f"Maintain breath retention comfortably at the peak for ~{p.hold_in:g}s.")
-
-    if measured_exh < p.exhale * 0.75:
-        recs.append(f"Extend your exhalation smoothly towards ~{p.exhale:g}s (currently {measured_exh:.1f}s).")
-    elif measured_exh > p.exhale * 1.35:
-        recs.append(f"Complete your exhalation a bit sooner towards ~{p.exhale:g}s.")
-
-    if bpm_diff > 1.2:
-        if measured_bpm < ideal_bpm:
-            recs.append(f"Breathe slightly more briskly towards {ideal_bpm:g} breaths per minute.")
-        else:
-            recs.append(f"Slow down your pace comfortably towards {ideal_bpm:g} breaths per minute.")
-
-    if p.cue and len(recs) < 2:
-        recs.append(p.cue)
-
-    if not recs:
-        recs.append("Maintain this exact calm rhythm and diaphragmatic focus.")
-
-    # Spoken natural human overview: NO colons, NO acronyms, NO parentheses!
-    import re
-    spoken_bpm = int(round(measured_bpm))
-    spoken_score = int(round(score))
-    primary_advice = recs[0].rstrip(".")
-    clean_spoken_advice = re.sub(r"\(currently\s*[^)]+\)", "", primary_advice)
-    clean_spoken_advice = re.sub(r"~(\d+(?:\.\d+)?)s\b", r"\1 seconds", clean_spoken_advice)
-    clean_spoken_advice = clean_spoken_advice.replace("~", "approximately ").strip(" .")
-
-    if p.hold_out > 0 or hld_out_ratio >= 0.3:
-        spoken_ratio = f"1 to {round(hld_ratio):g} to {round(exh_ratio):g} to {round(hld_out_ratio):g}"
-    else:
-        spoken_ratio = f"1 to {round(hld_ratio):g} to {round(exh_ratio):g}"
-
-    if score >= 80:
-        spoken_text = "Cycle complete. Grade A, excellent rhythm. Maintain this calm diaphragmatic focus."
-    elif score >= 70:
-        spoken_text = "Cycle complete. Grade B, steady breathing. Keep your exhalations smooth and controlled."
-    elif score >= 50:
-        spoken_text = "Cycle complete. Fair attempt. Focus on pacing each phase closely with the guide."
-    else:
-        spoken_text = "Cycle complete. Align your breath closely with the circle animation. Savor each breath."
 
     total_session_s = int(round(t[-1])) if len(t) else int(round(cyc_dur * cycle_num))
     import urllib.parse
