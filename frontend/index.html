@@ -44,6 +44,47 @@
     </form>
   </dialog>
 
+  <!-- Per-Cycle Respiration & DTW Review Modal (Clinical Dashboard) -->
+  <dialog id="cycleModal">
+    <div class="cycle-modal-header">
+      <button class="close" id="closeCycleModalBtn" aria-label="Close">✕</button>
+      <h2 id="cycleModalHeadline">Cycle Review</h2>
+      <p id="cycleModalSummary">Calculating cycle parameters...</p>
+    </div>
+
+    <table class="cycle-metrics-table">
+      <thead>
+        <tr>
+          <th>Respiration Parameter</th>
+          <th>Measured Value</th>
+          <th>Ideal Target</th>
+          <th>Assessment</th>
+        </tr>
+      </thead>
+      <tbody id="cycleMetricsBody"></tbody>
+    </table>
+
+    <div class="coach-recs-box">
+      <div class="coach-recs-title">COACH RECOMMENDATIONS:</div>
+      <ul id="cycleRecsList"></ul>
+    </div>
+
+    <div class="cycle-modal-actions">
+      <div style="display:flex; gap:10px;">
+        <button class="btn-continue-cycle" id="cycleModalResumeBtn">Continue Next Cycle ▶</button>
+        <button class="outline" id="cycleModalActionBtn" style="color:#dbe4ef; border-color:#3a4f6a; padding:11px 20px; border-radius:8px; cursor:pointer;">Close & Return to Dashboard</button>
+      </div>
+      <div class="cycle-modal-options">
+        <label>
+          <input type="checkbox" id="autoReviewToggle" checked> Auto-review after each cycle
+        </label>
+        <label>
+          <input type="checkbox" id="cycleVoiceToggle" checked> Voice overview (en-IN)
+        </label>
+      </div>
+    </div>
+  </dialog>
+
   <!-- Coach client loaded BEFORE app.js as required -->
   <script src="coach_client.js"></script>
   <script src="app.js"></script>

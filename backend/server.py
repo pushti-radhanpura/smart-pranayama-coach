@@ -98,6 +98,13 @@ class CompareRequest(BaseModel):
     values: list[float]
 
 
+class CycleReviewRequest(BaseModel):
+    pattern: str
+    cycle_num: int
+    t: list[float]
+    values: list[float]
+
+
 def _run(fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
@@ -135,6 +142,11 @@ def finish(c: Chunk):
 @app.post("/compare")
 def compare(req: CompareRequest):
     return _run(svc.compare_session, req.pattern, req.t, req.values)
+
+
+@app.post("/cycle-review")
+def cycle_review(req: CycleReviewRequest):
+    return _run(svc.cycle_review, req.pattern, req.cycle_num, req.t, req.values)
 
 
 # ----------------------------------------------------------------------------

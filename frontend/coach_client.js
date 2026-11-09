@@ -172,6 +172,20 @@
       return this._post("/compare", payload);
     }
 
+    /**
+     * Request clinical per-cycle respiration metrics review and verbal overview.
+     */
+    async cycleReview(cycleNum) {
+      if (this.t.length < 5) return null;
+      const payload = {
+        pattern: this.pattern,
+        cycle_num: cycleNum,
+        t: this.t,
+        values: this.v.map((x) => +x.toFixed(4)),
+      };
+      return this._post("/cycle-review", payload);
+    }
+
     say(text, urgent = false) {
       if (!this.voice.enabled || !text) return;
       if (this.voice.speakFn) {

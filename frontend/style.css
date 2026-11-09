@@ -856,3 +856,198 @@ dialog::backdrop {
     grid-template-columns: 1fr;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Per-Cycle Review Modal (Exact Design from clinical dashboard)
+   -------------------------------------------------------------------------- */
+dialog#cycleModal {
+  border: 1px solid #2d3d52;
+  border-radius: 14px;
+  background: #182230;
+  color: #eaf1fa;
+  padding: 26px 30px;
+  margin: auto;
+  max-width: 690px;
+  width: 95%;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+}
+
+dialog#cycleModal::backdrop {
+  background: rgba(10, 16, 24, 0.82);
+  backdrop-filter: blur(3px);
+}
+
+.cycle-modal-header {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.cycle-modal-header h2 {
+  font-family: Georgia, serif;
+  font-size: 24px;
+  color: #ffffff;
+  margin: 0 0 6px;
+  line-height: 1.25;
+}
+
+.cycle-modal-header p {
+  font-size: 13.5px;
+  color: #94a9c4;
+  line-height: 1.5;
+}
+
+.cycle-modal-header button.close {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: none;
+  border: none;
+  color: #8da2bd;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.cycle-modal-header button.close:hover {
+  color: #ffffff;
+}
+
+/* Cycle Metrics Table */
+table.cycle-metrics-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 13px;
+}
+
+table.cycle-metrics-table th {
+  text-align: left;
+  padding: 8px 10px;
+  color: #728aa8;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-bottom: 1px solid #27374d;
+}
+
+table.cycle-metrics-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #202e40;
+  color: #dbe4ef;
+}
+
+table.cycle-metrics-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.metric-name {
+  font-weight: 500;
+  color: #f1f5fa;
+}
+
+.metric-target {
+  color: #3dd6aa;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.metric-measured {
+  font-family: monospace;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+/* Badge Pills */
+.badge-pill {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge-pill.match {
+  background: #0d3830;
+  color: #3dd6aa;
+  border: 1px solid #1c6657;
+}
+
+.badge-pill.alert {
+  background: #3d1b1b;
+  color: #f77474;
+  border: 1px solid #6b2828;
+}
+
+/* Recommendations Box */
+.coach-recs-box {
+  background: #111a26;
+  border: 1px solid #203144;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 16px 0 20px;
+}
+
+.coach-recs-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #3dd6aa;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.coach-recs-box ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #c4d6ea;
+  line-height: 1.55;
+}
+
+.coach-recs-box ul li {
+  margin-bottom: 4px;
+}
+
+/* Bottom Actions */
+.cycle-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-continue-cycle {
+  background: #2ac89b;
+  color: #08261e;
+  border: none;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 11px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+}
+
+.btn-continue-cycle:hover {
+  background: #23ad86;
+}
+
+.cycle-modal-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #7e95b2;
+}
+
+.cycle-modal-options label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
