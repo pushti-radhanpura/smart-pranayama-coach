@@ -159,6 +159,22 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
     t, v = _check(pattern, t, values)
     p = dtw.PATTERNS[pattern]
     fs = 10.0
+
+    # Ensure waveform duration has at least 2.5s for butterworth filter stability
+    dur = float(t[-1] - t[0]) if len(t) > 1 else 0.0
+    if dur < 2.5:
+        reps = int(np.ceil(3.0 / max(0.1, dur)))
+        t_base = t - t[0]
+        step = (t_base[1] - t_base[0]) if len(t_base) > 1 else 0.05
+        t_list, v_list = [], []
+        curr_offset = 0.0
+        for _ in range(reps):
+            t_list.append(t_base + curr_offset)
+            v_list.append(v)
+            curr_offset += max(0.1, dur) + step
+        t = np.concatenate(t_list)
+        v = np.concatenate(v_list)
+
     x = dtw.preprocess(t, v, fs=fs)
 
     ideal_cycle, bounds = dtw.aligned_cycle(p, fs)
