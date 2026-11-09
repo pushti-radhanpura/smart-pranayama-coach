@@ -644,9 +644,6 @@
   async function handleFinish() {
     stop();
     document.getElementById("startBtn").textContent = "▶ Start";
-    if (coachClient && userWaveHistory.length >= 20) {
-      await coachClient.finish();
-    }
     const period = selected && selected.segments ? selected.segments.reduce((a, s) => a + s[1], 0) || 1 : 1;
     const cyc = Math.max(1, Math.floor(currentTime() / period) || 1);
     triggerCycleReview(cyc, true);
@@ -902,23 +899,7 @@
   let activeAudioPlayer = null;
 
   function playSpokenOverview(text, audioUrl) {
-    if (activeAudioPlayer) {
-      activeAudioPlayer.pause();
-      activeAudioPlayer = null;
-    }
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
-
-    if (audioUrl) {
-      const fullUrl = API_BASE + audioUrl;
-      const audio = new Audio();
-      activeAudioPlayer = audio;
-      audio.src = fullUrl;
-      audio.load();
-      audio.play().catch((err) => {
-        console.warn("Neural audio playback failed, falling back to local speech synthesis:", err);
-        if (coachClient) coachClient.say(text, true);
-      });
-    } else if (coachClient) {
+    if (coachClient) {
       coachClient.say(text, true);
     }
   }
@@ -1038,9 +1019,9 @@
     const modal = document.getElementById("cycleModal");
     if (!modal) return;
     function stopSpeech() {
-      if (activeAudioPlayer) {
-        activeAudioPlayer.pause();
-        activeAudioPlayer = null;
+      if (coachClient && coachClient._currentAudio) {
+        coachClient._currentAudio.pause();
+        coachClient._currentAudio = null;
       }
       if (window.speechSynthesis) window.speechSynthesis.cancel();
     }

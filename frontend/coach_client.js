@@ -97,11 +97,10 @@
       this.reset();
       this.sessionId = makeId();
       const ss = root.speechSynthesis;
-      if (this.voice.enabled && ss && typeof root.SpeechSynthesisUtterance !== "undefined") {
-        // Silent utterance satisfies the "gesture required" browser policy
-        const silent = new root.SpeechSynthesisUtterance("");
-        silent.volume = 0;
-        ss.speak(silent);
+      if (ss) ss.cancel();
+      if (this._currentAudio) {
+        this._currentAudio.pause();
+        this._currentAudio = null;
       }
     }
 
@@ -180,7 +179,7 @@
         };
         const res = await this._post("/finish", payload);
         this.onReview(res.review);
-        this.say(res.review, true);
+        // Do not speak here; the cycle review modal plays the studio neural voice overview
         return res.review;
       } catch (err) {
         this.onError(err);
@@ -223,14 +222,33 @@
         this.voice.speakFn(text, !!urgent);
         return;
       }
+
+      // Always cancel any existing browser speech synthesis to prevent double voices
       const ss = root.speechSynthesis;
-      if (!ss || typeof root.SpeechSynthesisUtterance === "undefined") return;
+      if (ss) ss.cancel();
 
-      if (ss.speaking && !urgent) return;
-      if (urgent) ss.cancel();
+      if (this._currentAudio) {
+        this._currentAudio.pause();
+        this._currentAudio = null;
+      }
 
-      // Clean text for speech: eliminate any robotic formatting, colons, or parentheses
-      const clean = String(text)
+      const clean = this._cleanForSpeech(text);
+      if (!clean) return;
+
+      // Primary: Studio-quality Neural TTS endpoint
+      const fullUrl = (this.apiBase || "") + "/tts?text=" + encodeURIComponent(clean) + "&voice=" + encodeURIComponent(this.voice.neuralVoice || "en-IN-NeerjaNeural");
+      const audio = new Audio();
+      this._currentAudio = audio;
+      audio.src = fullUrl;
+      audio.load();
+      audio.play().catch((err) => {
+        console.warn("Studio neural audio play failed, falling back to local speech:", err);
+        this._fallbackBrowserSpeak(clean);
+      });
+    }
+
+    _cleanForSpeech(text) {
+      return String(text)
         .replace(/(\d+)\s*:\s*(\d+)/g, "$1 to $2")
         .replace(/(\d+)\s*:\s*(\d+)/g, "$1 to $2")
         .replace(/(\d+)\s*:\s*(\d+)/g, "$1 to $2")
@@ -245,46 +263,30 @@
         .replace(/(\d+)\s*mL\b/g, "$1 milliliters")
         .replace(/\s+/g, " ")
         .trim();
+    }
+
+    _fallbackBrowserSpeak(clean) {
+      const ss = root.speechSynthesis;
+      if (!ss || typeof root.SpeechSynthesisUtterance === "undefined") return;
+      ss.cancel();
 
       const u = new root.SpeechSynthesisUtterance(clean);
       u.rate = this.voice.rate || 0.90;
       u.pitch = this.voice.pitch || 1.0;
       u.volume = 1.0;
 
-      let voices = ss.getVoices ? ss.getVoices() : [];
-      if (!voices.length && "onvoiceschanged" in ss) {
-        ss.onvoiceschanged = () => {
-          this._voices = ss.getVoices ? ss.getVoices() : [];
-          this.say(text, urgent);
-        };
-        return;
-      }
-
-      let pick = null;
-
-      // 1. If user explicitly selected a voice by name
-      if (this.voice.selectedVoiceName) {
-        pick = voices.find((v) => v.name === this.voice.selectedVoiceName);
-      }
-
-      // 2. High priority: Google UK English Female / Google US English / Natural voices
-      if (!pick) {
-        pick =
-          voices.find((v) => v.name && v.name.includes("UK English Female")) ||
-          voices.find((v) => v.name && v.name.includes("US English")) ||
-          voices.find((v) => v.name && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Neural")) && v.lang && v.lang.startsWith("en")) ||
-          voices.find((v) => v.lang === "en-IN") ||
-          voices.find((v) => v.lang === "en-GB") ||
-          voices.find((v) => v.lang === "en-US") ||
-          voices.find((v) => v.lang && v.lang.startsWith("en")) ||
-          voices[0];
-      }
+      const voices = ss.getVoices ? ss.getVoices() : [];
+      let pick =
+        voices.find((v) => v.name && v.name.includes("UK English Female")) ||
+        voices.find((v) => v.name && v.name.includes("US English")) ||
+        voices.find((v) => v.lang === "en-IN") ||
+        voices.find((v) => v.lang && v.lang.startsWith("en")) ||
+        voices[0];
 
       if (pick) {
         u.voice = pick;
         u.lang = pick.lang;
       }
-
       ss.speak(u);
     }
 
