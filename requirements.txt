@@ -1,0 +1,9 @@
+numpy
+scipy
+fastapi
+uvicorn
+python-multipart
+edge-tts
+gTTS
+# matplotlib>=3.5.0  # Optional: only for offline PNG dashboard plotting & sensor CLI
+# numba>=0.56.0       # Optional: JIT speed-up for banded DTW matrix
