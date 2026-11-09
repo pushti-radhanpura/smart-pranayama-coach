@@ -349,6 +349,7 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
     )
 
     total_session_s = int(round(t[-1])) if len(t) else int(round(cyc_dur * cycle_num))
+    import urllib.parse
 
     return {
         "cycle_num": cycle_num,
@@ -361,6 +362,7 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
             f"at {measured_bpm} BPM (target {ideal_bpm} BPM)."
         ),
         "spoken_text": spoken_text,
+        "audio_url": f"/tts?text={urllib.parse.quote(spoken_text)}&voice=en-IN-NeerjaNeural",
         "score": score,
         "grade": grade,
         "parameters": [

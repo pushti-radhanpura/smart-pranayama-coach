@@ -27,7 +27,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -147,6 +147,32 @@ def compare(req: CompareRequest):
 @app.post("/cycle-review")
 def cycle_review(req: CycleReviewRequest):
     return _run(svc.cycle_review, req.pattern, req.cycle_num, req.t, req.values)
+
+
+@app.get("/tts")
+async def tts_endpoint(text: str = "", voice: str = "en-IN-NeerjaNeural"):
+    """High-definition neural speech synthesis for crystal-clear voice coaching."""
+    if not text.strip():
+        raise HTTPException(400, "Missing text parameter")
+    try:
+        import edge_tts
+        communicate = edge_tts.Communicate(text, voice)
+        mp3_bytes = bytearray()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                mp3_bytes.extend(chunk["data"])
+        return Response(content=bytes(mp3_bytes), media_type="audio/mpeg")
+    except Exception as e:
+        try:
+            from gtts import gTTS
+            import io
+            buf = io.BytesIO()
+            tts = gTTS(text=text, lang="en", tld="co.in")
+            tts.write_to_fp(buf)
+            buf.seek(0)
+            return Response(content=buf.read(), media_type="audio/mpeg")
+        except Exception as e2:
+            raise HTTPException(500, f"TTS generation error: {e2}")
 
 
 # ----------------------------------------------------------------------------

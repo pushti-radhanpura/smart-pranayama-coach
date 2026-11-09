@@ -898,6 +898,30 @@
   // Per-Cycle Clinical Respiration Review & Spoken Overview
   // --------------------------------------------------------------------------
   let latestCycleSpokenText = "";
+  let latestCycleAudioUrl = "";
+  let activeAudioPlayer = null;
+
+  function playSpokenOverview(text, audioUrl) {
+    if (activeAudioPlayer) {
+      activeAudioPlayer.pause();
+      activeAudioPlayer = null;
+    }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+    if (audioUrl) {
+      const fullUrl = API_BASE + audioUrl;
+      const audio = new Audio();
+      activeAudioPlayer = audio;
+      audio.src = fullUrl;
+      audio.load();
+      audio.play().catch((err) => {
+        console.warn("Neural audio playback failed, falling back to local speech synthesis:", err);
+        if (coachClient) coachClient.say(text, true);
+      });
+    } else if (coachClient) {
+      coachClient.say(text, true);
+    }
+  }
 
   async function triggerCycleReview(cycleNum, isManual = false) {
     if (cycleReviewInProgress) return;
@@ -960,12 +984,13 @@
         recsList.innerHTML = `<li>Maintain this exact calm rhythm for upcoming cycles.</li>`;
       }
 
-      // Spoken voice overview (browser SpeechSynthesis via coachClient)
+      // Spoken voice overview (Studio neural audio with speech synthesis fallback)
       latestCycleSpokenText = rev.spoken_text || "";
+      latestCycleAudioUrl = rev.audio_url || "";
       const voiceCheck = document.getElementById("cycleVoiceToggle");
       const shouldSpeak = voiceCheck ? voiceCheck.checked : voiceEnabled;
-      if (shouldSpeak && rev.spoken_text && coachClient) {
-        coachClient.say(rev.spoken_text, true);
+      if (shouldSpeak && latestCycleSpokenText) {
+        playSpokenOverview(latestCycleSpokenText, latestCycleAudioUrl);
       }
     } catch (err) {
       console.error("Cycle review error:", err);
@@ -1012,18 +1037,25 @@
   function initCycleModal() {
     const modal = document.getElementById("cycleModal");
     if (!modal) return;
+    function stopSpeech() {
+      if (activeAudioPlayer) {
+        activeAudioPlayer.pause();
+        activeAudioPlayer = null;
+      }
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+    }
     const closeBtn = document.getElementById("closeCycleModalBtn");
     if (closeBtn) {
       closeBtn.onclick = () => {
         modal.close();
-        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        stopSpeech();
       };
     }
     const resumeBtn = document.getElementById("cycleModalResumeBtn");
     if (resumeBtn) {
       resumeBtn.onclick = () => {
         modal.close();
-        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        stopSpeech();
         if (!running) handleToggleStart();
       };
     }
@@ -1031,15 +1063,15 @@
     if (actionBtn) {
       actionBtn.onclick = () => {
         modal.close();
-        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        stopSpeech();
         location.hash = "#pranayamas";
       };
     }
     const replayBtn = document.getElementById("replayVoiceBtn");
     if (replayBtn) {
       replayBtn.onclick = () => {
-        if (coachClient && latestCycleSpokenText) {
-          coachClient.say(latestCycleSpokenText, true);
+        if (latestCycleSpokenText) {
+          playSpokenOverview(latestCycleSpokenText, latestCycleAudioUrl);
         }
       };
     }
