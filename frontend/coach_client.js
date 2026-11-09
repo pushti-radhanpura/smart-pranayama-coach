@@ -25,7 +25,7 @@
 
   class CoachClient {
     constructor(options = {}) {
-      this.apiBase = (options.apiBase || "").replace(/\/$/, "");
+      this.apiBase = (options.apiBase || (root.location && root.location.protocol === "file:" ? "http://127.0.0.1:8000" : "")).replace(/\/$/, "");
       this.pattern = options.pattern || "sama_vritti";
       this.guided = options.guided !== false; // true = locked to guide clock
       this.checkEverySec = options.checkEverySec || 10;

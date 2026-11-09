@@ -72,10 +72,12 @@ app = FastAPI(title="Smart Pranayama Breathing Coach API", lifespan=lifespan)
 # CORS configuration
 cors_env = os.getenv("CORS_ORIGINS", "*")
 origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+if "*" in origins or origins == ["*"]:
+    origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins else ["*"],
-    allow_credentials=True,
+    allow_origins=origins if origins != ["*"] else ["*", "null"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

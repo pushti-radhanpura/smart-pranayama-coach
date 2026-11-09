@@ -120,7 +120,11 @@
   ];
 
   const app = document.getElementById("app");
-  const API_BASE = (window.COACH_API_BASE || localStorage.getItem("coach_api_url") || "").replace(/\/$/, "");
+  const API_BASE = (
+    window.COACH_API_BASE ||
+    localStorage.getItem("coach_api_url") ||
+    (location.protocol === "file:" ? "http://127.0.0.1:8000" : "")
+  ).replace(/\/$/, "");
   let tick = null;
   let elapsed = 0;
   let running = false;
