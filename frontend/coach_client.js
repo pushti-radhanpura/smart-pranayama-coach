@@ -58,8 +58,31 @@
       };
 
       this._initVoices();
+      this._initAudioBank();
       this.fetchFn = options.fetchImpl || (typeof fetch === "function" ? fetch.bind(root) : null);
       this.reset();
+    }
+
+    _initAudioBank() {
+      const base = this.apiBase || "";
+      const phrases = [
+        "Cycle complete. Grade A, excellent rhythm. Maintain this calm diaphragmatic focus.",
+        "Cycle complete. Grade B, steady breathing. Keep your exhalations smooth and controlled.",
+        "Cycle complete. Fair attempt. Focus on pacing each phase closely with the guide.",
+        "Cycle complete. Align your breath closely with the circle animation. Savor each breath.",
+        "Session complete! Outstanding practice with solid rhythm and mastery. Great work!",
+        "Session complete! Well done, you maintained good consistency throughout the practice.",
+        "Session complete. Thank you for practicing. Consistency will bring deeper breath control.",
+        "Session complete. Good effort today. Follow the visual circle closely in your next session.",
+      ];
+      this._audioBank = {};
+      phrases.forEach((txt) => {
+        const url = base + "/tts?text=" + encodeURIComponent(txt) + "&voice=" + encodeURIComponent(this.voice.neuralVoice || "en-IN-NeerjaNeural");
+        const a = new Audio();
+        a.preload = "auto";
+        a.src = url;
+        this._audioBank[txt] = a;
+      });
     }
 
     _initVoices() {
@@ -243,7 +266,24 @@
         this._currentAudio = null;
       }
 
+      // Instant RAM playback from preloaded audio bank (< 5ms delay)
+      if (text && this._audioBank && this._audioBank[text]) {
+        const item = this._audioBank[text];
+        this._currentAudio = item;
+        item.currentTime = 0;
+        item.play().catch(() => {});
+        return;
+      }
+
       const clean = this._cleanForSpeech(text || "");
+      if (clean && this._audioBank && this._audioBank[clean]) {
+        const item = this._audioBank[clean];
+        this._currentAudio = item;
+        item.currentTime = 0;
+        item.play().catch(() => {});
+        return;
+      }
+
       const fullUrl = audioUrl || ((this.apiBase || "") + "/tts?text=" + encodeURIComponent(clean) + "&voice=" + encodeURIComponent(this.voice.neuralVoice || "en-IN-NeerjaNeural"));
 
       const audio = new Audio();

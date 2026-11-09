@@ -143,11 +143,14 @@ def finish_session(session_id: str, pattern: str, t, values) -> dict:
     if not recs:
         recs.append("Maintain this regular daily rhythm for best mindfulness and respiratory benefits.")
 
-    spoken_score = int(round(session_score))
-    spoken_text = (
-        f"Session complete! You completed {n_cycles} cycles of {p.name} with an overall "
-        f"mastery score of {spoken_score} percent, {grade}. {closing_advice}"
-    )
+    if session_score >= 80:
+        spoken_text = "Session complete! Outstanding practice with solid rhythm and mastery. Great work!"
+    elif session_score >= 70:
+        spoken_text = "Session complete! Well done, you maintained good consistency throughout the practice."
+    elif session_score >= 50:
+        spoken_text = "Session complete. Thank you for practicing. Consistency will bring deeper breath control."
+    else:
+        spoken_text = "Session complete. Good effort today. Follow the visual circle closely in your next session."
 
     import urllib.parse
     return {
@@ -442,10 +445,14 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
     else:
         spoken_ratio = f"1 to {round(hld_ratio):g} to {round(exh_ratio):g}"
 
-    spoken_text = (
-        f"Cycle {cycle_num} complete. Score {spoken_score} percent, {grade}. "
-        f"Breath ratio {spoken_ratio}. {clean_spoken_advice}."
-    )
+    if score >= 80:
+        spoken_text = "Cycle complete. Grade A, excellent rhythm. Maintain this calm diaphragmatic focus."
+    elif score >= 70:
+        spoken_text = "Cycle complete. Grade B, steady breathing. Keep your exhalations smooth and controlled."
+    elif score >= 50:
+        spoken_text = "Cycle complete. Fair attempt. Focus on pacing each phase closely with the guide."
+    else:
+        spoken_text = "Cycle complete. Align your breath closely with the circle animation. Savor each breath."
 
     total_session_s = int(round(t[-1])) if len(t) else int(round(cyc_dur * cycle_num))
     import urllib.parse

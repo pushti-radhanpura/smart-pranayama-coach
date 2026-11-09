@@ -46,6 +46,23 @@ os.makedirs(TTS_CACHE_DIR, exist_ok=True)
 _tts_memory_cache: dict[str, bytes] = {}
 
 
+def _load_cache_into_memory():
+    if os.path.exists(TTS_CACHE_DIR):
+        for fname in os.listdir(TTS_CACHE_DIR):
+            if fname.endswith(".mp3"):
+                key = fname[:-4]
+                path = os.path.join(TTS_CACHE_DIR, fname)
+                try:
+                    with open(path, "rb") as f:
+                        _tts_memory_cache[key] = f.read()
+                except Exception:
+                    pass
+    print(f"Preloaded {len(_tts_memory_cache)} studio neural voice files into RAM.")
+
+
+_load_cache_into_memory()
+
+
 def _get_tts_cache_key(text: str, voice: str) -> str:
     norm = f"{voice.strip().lower()}::{text.strip().lower()}"
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
