@@ -207,18 +207,8 @@ class LiveCoach:
 # On the website use the browser's built-in speechSynthesis instead.
 # --------------------------------------------------------------------------
 def speak_local(text: str) -> None:
-    try:
-        import pyttsx3
-    except ImportError:
-        print("      (no voice: run  pip install pyttsx3  and try again)")
-        return
-    try:
-        eng = pyttsx3.init()
-        eng.setProperty("rate", 150)       # words per minute - lower is calmer
-        eng.say(text)
-        eng.runAndWait()
-    except Exception as e:                 # e.g. no audio device
-        print(f"      (voice failed: {e})")
+    """Offline desktop speech stub - robotic synthesizer permanently disabled in favor of Studio Neural Voice."""
+    pass
 
 
 # --------------------------------------------------------------------------

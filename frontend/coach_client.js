@@ -14,6 +14,16 @@
 (function (root) {
   "use strict";
 
+  // Permanently disable robotic browser SpeechSynthesis across the entire application
+  if (typeof root !== "undefined" && root.speechSynthesis) {
+    try {
+      root.speechSynthesis.cancel();
+      root.speechSynthesis.speak = function () {
+        console.warn("[Voice] Native browser speech synthesis is permanently blocked.");
+      };
+    } catch (e) {}
+  }
+
   const BIN_S = 0.1; // 10 samples per second
 
   function makeId() {
@@ -169,7 +179,7 @@
      */
     async finish() {
       this.stopped = true;
-      if (this.t.length < 20) return null;
+      if (this.t.length < 5) return null;
       try {
         const payload = {
           session_id: this.sessionId,
@@ -178,9 +188,10 @@
           values: this.v.map((x) => +x.toFixed(4)),
         };
         const res = await this._post("/finish", payload);
-        this.onReview(res.review);
-        // Do not speak here; the cycle review modal plays the studio neural voice overview
-        return res.review;
+        if (res && res.review_text) {
+          this.onReview(res.review_text);
+        }
+        return res;
       } catch (err) {
         this.onError(err);
         return null;
@@ -216,14 +227,14 @@
       return this._post("/cycle-review", payload);
     }
 
-    say(text, urgent = false) {
-      if (!this.voice.enabled || !text) return;
+    say(text, audioUrl = null) {
+      if (!this.voice.enabled || (!text && !audioUrl)) return;
       if (this.voice.speakFn) {
-        this.voice.speakFn(text, !!urgent);
+        this.voice.speakFn(text);
         return;
       }
 
-      // Always cancel any existing browser speech synthesis to prevent double voices
+      // Neutralize any browser speech synthesis
       const ss = root.speechSynthesis;
       if (ss) ss.cancel();
 
@@ -232,18 +243,16 @@
         this._currentAudio = null;
       }
 
-      const clean = this._cleanForSpeech(text);
-      if (!clean) return;
+      const clean = this._cleanForSpeech(text || "");
+      const fullUrl = audioUrl || ((this.apiBase || "") + "/tts?text=" + encodeURIComponent(clean) + "&voice=" + encodeURIComponent(this.voice.neuralVoice || "en-IN-NeerjaNeural"));
 
-      // Primary: Studio-quality Neural TTS endpoint
-      const fullUrl = (this.apiBase || "") + "/tts?text=" + encodeURIComponent(clean) + "&voice=" + encodeURIComponent(this.voice.neuralVoice || "en-IN-NeerjaNeural");
       const audio = new Audio();
       this._currentAudio = audio;
+      audio.preload = "auto";
       audio.src = fullUrl;
       audio.load();
       audio.play().catch((err) => {
-        console.warn("Studio neural audio play failed, falling back to local speech:", err);
-        this._fallbackBrowserSpeak(clean);
+        console.warn("[Studio Voice] Neural audio playback deferred or muted:", err);
       });
     }
 
@@ -263,31 +272,6 @@
         .replace(/(\d+)\s*mL\b/g, "$1 milliliters")
         .replace(/\s+/g, " ")
         .trim();
-    }
-
-    _fallbackBrowserSpeak(clean) {
-      const ss = root.speechSynthesis;
-      if (!ss || typeof root.SpeechSynthesisUtterance === "undefined") return;
-      ss.cancel();
-
-      const u = new root.SpeechSynthesisUtterance(clean);
-      u.rate = this.voice.rate || 0.90;
-      u.pitch = this.voice.pitch || 1.0;
-      u.volume = 1.0;
-
-      const voices = ss.getVoices ? ss.getVoices() : [];
-      let pick =
-        voices.find((v) => v.name && v.name.includes("UK English Female")) ||
-        voices.find((v) => v.name && v.name.includes("US English")) ||
-        voices.find((v) => v.lang === "en-IN") ||
-        voices.find((v) => v.lang && v.lang.startsWith("en")) ||
-        voices[0];
-
-      if (pick) {
-        u.voice = pick;
-        u.lang = pick.lang;
-      }
-      ss.speak(u);
     }
 
     async _post(path, body) {

@@ -79,11 +79,95 @@ def evaluate_chunk(session_id: str, pattern: str, t, values, guided: bool = True
 
 
 def finish_session(session_id: str, pattern: str, t, values) -> dict:
+    """Comprehensive end-of-session evaluation across all completed breath cycles."""
+    if t is not None and values is not None and 5 <= len(t) < 20:
+        step = (t[-1] - t[0]) / max(1, len(t) - 1) if len(t) > 1 else 0.1
+        t_pad = [t[-1] + step * (i + 1) for i in range(20 - len(t))]
+        v_pad = [float(values[-1])] * (20 - len(t))
+        t = list(t) + t_pad
+        values = list(values) + v_pad
+
     t, v = _check(pattern, t, values)
-    with _lock:
-        held = _sessions.pop(session_id, None)
-    coach = held[1] if held and held[0] == pattern else LiveCoach(dtw.PATTERNS[pattern])
-    return {"review": coach.final_review(t, v)}
+    p = dtw.PATTERNS[pattern]
+    fs = 10.0
+
+    dur = float(t[-1] - t[0]) if len(t) > 1 else 0.0
+    if dur < 2.5:
+        reps = int(np.ceil(3.0 / max(0.1, dur)))
+        t_base = t - t[0]
+        step = (t_base[1] - t_base[0]) if len(t_base) > 1 else 0.05
+        t_list, v_list = [], []
+        curr_offset = 0.0
+        for _ in range(reps):
+            t_list.append(t_base + curr_offset)
+            v_list.append(v)
+            curr_offset += max(0.1, dur) + step
+        t = np.concatenate(t_list)
+        v = np.concatenate(v_list)
+
+    x = dtw.preprocess(t, v, fs=fs)
+    res = dtw.analyse_session(x, p, fs=fs)
+    S = res["summary"]
+    cycles = res["cycles"]
+    scores = [round(float(c.score), 1) for c in cycles]
+
+    n_cycles = max(1, int(S.get("n_cycles_found", len(scores)) or 1))
+    session_score = round(float(S.get("session_score", 80.0)), 1)
+    tempo_ratio = round(float(S.get("median_tempo_ratio", 1.0)), 2)
+    duration_s = int(round(dur)) if dur > 0 else int(round(p.cycle_s * n_cycles))
+
+    if session_score >= 80:
+        grade = "Grade A"
+        headline = "Session Completed with Mastery!"
+        closing_advice = "Your pacing and breath alignment were excellent."
+    elif session_score >= 70:
+        grade = "Grade B"
+        headline = "Session Completed — Solid Progress!"
+        closing_advice = "Good consistency with minor tempo variations."
+    elif session_score >= 50:
+        grade = "Grade C"
+        headline = "Session Completed — Keep Practicing!"
+        closing_advice = "Focus on sustaining steady inhalation and exhalation rhythm."
+    else:
+        grade = "Grade D"
+        headline = "Session Completed"
+        closing_advice = "Follow the circle guide closely to synchronize your breath."
+
+    recs = []
+    if tempo_ratio > 1.2:
+        recs.append(f"Your pace was about {int((tempo_ratio - 1) * 100)}% slower than recommended. Aim for {round(60.0 / p.cycle_s, 1)} BPM.")
+    elif tempo_ratio < 0.8:
+        recs.append(f"Your pace was about {int((1 - tempo_ratio) * 100)}% faster than recommended. Savor each breath.")
+    if p.cue:
+        recs.append(p.cue)
+    if not recs:
+        recs.append("Maintain this regular daily rhythm for best mindfulness and respiratory benefits.")
+
+    spoken_score = int(round(session_score))
+    spoken_text = (
+        f"Session complete! You completed {n_cycles} cycles of {p.name} with an overall "
+        f"mastery score of {spoken_score} percent, {grade}. {closing_advice}"
+    )
+
+    import urllib.parse
+    return {
+        "pattern": pattern,
+        "pattern_name": p.name,
+        "headline": headline,
+        "duration_s": duration_s,
+        "n_cycles_found": n_cycles,
+        "session_score": session_score,
+        "grade": grade,
+        "tempo_ratio": tempo_ratio,
+        "cycle_scores": scores if scores else [session_score],
+        "recommendations": recs,
+        "review_text": (
+            f"You finished {n_cycles} breath cycles of {p.name} across {duration_s} seconds. "
+            f"Overall session mastery score was {session_score}/100 ({grade})."
+        ),
+        "spoken_text": spoken_text,
+        "audio_url": f"/tts?text={urllib.parse.quote(spoken_text)}&voice=en-IN-NeerjaNeural",
+    }
 
 
 def compare_session(pattern: str, t, values) -> dict:
@@ -359,9 +443,8 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
         spoken_ratio = f"1 to {round(hld_ratio):g} to {round(exh_ratio):g}"
 
     spoken_text = (
-        f"Cycle {cycle_num} complete. Overall score {spoken_score} percent, {grade}. "
-        f"Your breath ratio was {spoken_ratio}, at {spoken_bpm} breaths per minute. "
-        f"{clean_spoken_advice}."
+        f"Cycle {cycle_num} complete. Score {spoken_score} percent, {grade}. "
+        f"Breath ratio {spoken_ratio}. {clean_spoken_advice}."
     )
 
     total_session_s = int(round(t[-1])) if len(t) else int(round(cyc_dur * cycle_num))

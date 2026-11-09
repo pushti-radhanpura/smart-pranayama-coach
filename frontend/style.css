@@ -860,7 +860,8 @@ dialog::backdrop {
 /* --------------------------------------------------------------------------
    Per-Cycle Review Modal (Theme-Consistent Vintage Warm Paper Aesthetic)
    -------------------------------------------------------------------------- */
-dialog#cycleModal {
+dialog#cycleModal,
+dialog#sessionModal {
   border: 1.5px solid #ded3c1;
   border-radius: 14px;
   background: #fdfbf7;
@@ -872,9 +873,40 @@ dialog#cycleModal {
   box-shadow: 0 24px 60px rgba(50, 38, 28, 0.22), 0 4px 16px rgba(50, 38, 28, 0.08);
 }
 
-dialog#cycleModal::backdrop {
+dialog#cycleModal::backdrop,
+dialog#sessionModal::backdrop {
   background: rgba(43, 35, 29, 0.55);
   backdrop-filter: blur(4px);
+}
+
+.session-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.session-stat-card {
+  background: #faf4eb;
+  border: 1px solid #e8dec9;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.session-stat-val {
+  font-family: Georgia, serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #a84a32;
+  margin-bottom: 2px;
+}
+
+.session-stat-lbl {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #7d6b5c;
 }
 
 .cycle-modal-header {
