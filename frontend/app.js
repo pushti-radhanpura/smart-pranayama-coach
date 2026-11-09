@@ -897,6 +897,8 @@
   // --------------------------------------------------------------------------
   // Per-Cycle Clinical Respiration Review & Spoken Overview
   // --------------------------------------------------------------------------
+  let latestCycleSpokenText = "";
+
   async function triggerCycleReview(cycleNum, isManual = false) {
     if (cycleReviewInProgress) return;
     const modal = document.getElementById("cycleModal");
@@ -959,6 +961,7 @@
       }
 
       // Spoken voice overview (browser SpeechSynthesis via coachClient)
+      latestCycleSpokenText = rev.spoken_text || "";
       const voiceCheck = document.getElementById("cycleVoiceToggle");
       const shouldSpeak = voiceCheck ? voiceCheck.checked : voiceEnabled;
       if (shouldSpeak && rev.spoken_text && coachClient) {
@@ -988,7 +991,7 @@
       cycle_num: cycleNum,
       headline: "Well Done! Solid adherence and rhythm throughout the cycle.",
       summary_text: `You completed cycle ${cycleNum} of ${pName} with an overall mastery score of 82/100 (Grade A). Measured ratio was ${measuredRatio} at ${bpm} BPM (target ${bpm} BPM).`,
-      spoken_text: `Cycle ${cycleNum} complete. Score 82 percent, Grade A. Measured ratio ${measuredRatio} at ${bpm} breaths per minute. Maintain this calm rhythm.`,
+      spoken_text: `Cycle ${cycleNum} complete. Overall score 82 percent, Grade A. Your breath ratio was 1 to ${Math.round(hld / inh)} to ${Math.round(exh / inh)}, at ${Math.round(bpm)} breaths per minute. Maintain this calm rhythm.`,
       score: 82.0,
       grade: "Grade A",
       parameters: [
@@ -1030,6 +1033,14 @@
         modal.close();
         if (window.speechSynthesis) window.speechSynthesis.cancel();
         location.hash = "#pranayamas";
+      };
+    }
+    const replayBtn = document.getElementById("replayVoiceBtn");
+    if (replayBtn) {
+      replayBtn.onclick = () => {
+        if (coachClient && latestCycleSpokenText) {
+          coachClient.say(latestCycleSpokenText, true);
+        }
       };
     }
   }

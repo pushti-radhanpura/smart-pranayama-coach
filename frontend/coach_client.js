@@ -40,13 +40,44 @@
 
       this.voice = {
         enabled: options.voice !== false,
-        lang: options.lang || "en-IN",
-        rate: options.rate || 0.9,
+        lang: options.lang || "en-US",
+        rate: options.rate || 0.90,
+        pitch: options.pitch || 1.0,
+        selectedVoiceName: options.voiceName || null,
         speakFn: options.speakFn || null,
       };
 
+      this._initVoices();
       this.fetchFn = options.fetchImpl || (typeof fetch === "function" ? fetch.bind(root) : null);
       this.reset();
+    }
+
+    _initVoices() {
+      const ss = root.speechSynthesis;
+      if (!ss) return;
+      this._voices = ss.getVoices ? ss.getVoices() : [];
+      if (typeof ss.addEventListener === "function") {
+        ss.addEventListener("voiceschanged", () => {
+          this._voices = ss.getVoices ? ss.getVoices() : [];
+        });
+      } else if ("onvoiceschanged" in ss) {
+        ss.onvoiceschanged = () => {
+          this._voices = ss.getVoices ? ss.getVoices() : [];
+        };
+      }
+    }
+
+    getVoices() {
+      const ss = root.speechSynthesis;
+      if (ss && ss.getVoices) {
+        const v = ss.getVoices();
+        if (v && v.length) this._voices = v;
+      }
+      return (this._voices || []).filter((v) => v.lang && (v.lang.startsWith("en") || v.lang.startsWith("hi")));
+    }
+
+    setVoice(voiceName) {
+      this.voice.selectedVoiceName = voiceName;
     }
 
     reset() {
@@ -198,15 +229,61 @@
       if (ss.speaking && !urgent) return;
       if (urgent) ss.cancel();
 
-      const u = new root.SpeechSynthesisUtterance(text);
-      u.lang = this.voice.lang;
-      u.rate = this.voice.rate;
+      // Clean text for speech: eliminate any robotic formatting, colons, or parentheses
+      const clean = String(text)
+        .replace(/(\d+)\s*:\s*(\d+)/g, "$1 to $2")
+        .replace(/(\d+)\s*:\s*(\d+)/g, "$1 to $2")
+        .replace(/(\d+)\s*:\s*(\d+)/g, "$1 to $2")
+        .replace(/\bBPM\b/gi, "breaths per minute")
+        .replace(/\bPEF\b/gi, "peak flow")
+        .replace(/\bVt\b/gi, "tidal volume")
+        .replace(/\bDTW\b/gi, "alignment")
+        .replace(/\(currently\s*[^)]+\)/gi, "")
+        .replace(/\s*\([^)]*\)/g, "")
+        .replace(/~/g, "approximately ")
+        .replace(/(\d+)\s*s\b/g, "$1 seconds")
+        .replace(/(\d+)\s*mL\b/g, "$1 milliliters")
+        .replace(/\s+/g, " ")
+        .trim();
 
-      const voices = ss.getVoices ? ss.getVoices() : [];
-      const pick =
-        voices.find((v) => v.lang === u.lang) ||
-        voices.find((v) => v.lang.startsWith("en"));
-      if (pick) u.voice = pick;
+      const u = new root.SpeechSynthesisUtterance(clean);
+      u.rate = this.voice.rate || 0.90;
+      u.pitch = this.voice.pitch || 1.0;
+      u.volume = 1.0;
+
+      let voices = ss.getVoices ? ss.getVoices() : [];
+      if (!voices.length && "onvoiceschanged" in ss) {
+        ss.onvoiceschanged = () => {
+          this._voices = ss.getVoices ? ss.getVoices() : [];
+          this.say(text, urgent);
+        };
+        return;
+      }
+
+      let pick = null;
+
+      // 1. If user explicitly selected a voice by name
+      if (this.voice.selectedVoiceName) {
+        pick = voices.find((v) => v.name === this.voice.selectedVoiceName);
+      }
+
+      // 2. High priority: Google UK English Female / Google US English / Natural voices
+      if (!pick) {
+        pick =
+          voices.find((v) => v.name && v.name.includes("UK English Female")) ||
+          voices.find((v) => v.name && v.name.includes("US English")) ||
+          voices.find((v) => v.name && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Neural")) && v.lang && v.lang.startsWith("en")) ||
+          voices.find((v) => v.lang === "en-IN") ||
+          voices.find((v) => v.lang === "en-GB") ||
+          voices.find((v) => v.lang === "en-US") ||
+          voices.find((v) => v.lang && v.lang.startsWith("en")) ||
+          voices[0];
+      }
+
+      if (pick) {
+        u.voice = pick;
+        u.lang = pick.lang;
+      }
 
       ss.speak(u);
     }

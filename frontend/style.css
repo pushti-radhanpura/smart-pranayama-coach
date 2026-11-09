@@ -858,23 +858,23 @@ dialog::backdrop {
 }
 
 /* --------------------------------------------------------------------------
-   Per-Cycle Review Modal (Exact Design from clinical dashboard)
+   Per-Cycle Review Modal (Theme-Consistent Vintage Warm Paper Aesthetic)
    -------------------------------------------------------------------------- */
 dialog#cycleModal {
-  border: 1px solid #2d3d52;
+  border: 1.5px solid #ded3c1;
   border-radius: 14px;
-  background: #182230;
-  color: #eaf1fa;
+  background: #fdfbf7;
+  color: #2b231d;
   padding: 26px 30px;
   margin: auto;
   max-width: 690px;
   width: 95%;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 24px 60px rgba(50, 38, 28, 0.22), 0 4px 16px rgba(50, 38, 28, 0.08);
 }
 
 dialog#cycleModal::backdrop {
-  background: rgba(10, 16, 24, 0.82);
-  backdrop-filter: blur(3px);
+  background: rgba(43, 35, 29, 0.55);
+  backdrop-filter: blur(4px);
 }
 
 .cycle-modal-header {
@@ -884,16 +884,17 @@ dialog#cycleModal::backdrop {
 
 .cycle-modal-header h2 {
   font-family: Georgia, serif;
-  font-size: 24px;
-  color: #ffffff;
+  font-size: 23px;
+  color: #2b231d;
   margin: 0 0 6px;
   line-height: 1.25;
 }
 
 .cycle-modal-header p {
   font-size: 13.5px;
-  color: #94a9c4;
+  color: #6d5f53;
   line-height: 1.5;
+  margin: 0;
 }
 
 .cycle-modal-header button.close {
@@ -902,14 +903,15 @@ dialog#cycleModal::backdrop {
   right: -6px;
   background: none;
   border: none;
-  color: #8da2bd;
+  color: #8c7a6b;
   font-size: 22px;
   cursor: pointer;
   padding: 4px 8px;
+  line-height: 1;
 }
 
 .cycle-modal-header button.close:hover {
-  color: #ffffff;
+  color: #2b231d;
 }
 
 /* Cycle Metrics Table */
@@ -922,39 +924,40 @@ table.cycle-metrics-table {
 
 table.cycle-metrics-table th {
   text-align: left;
-  padding: 8px 10px;
-  color: #728aa8;
+  padding: 9px 10px;
+  color: #7c6b5d;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  border-bottom: 1px solid #27374d;
+  border-bottom: 1.5px solid #e2d5c3;
+  background: #faf4eb;
 }
 
 table.cycle-metrics-table td {
   padding: 9px 10px;
-  border-bottom: 1px solid #202e40;
-  color: #dbe4ef;
+  border-bottom: 1px solid #ebdccb;
+  color: #2b231d;
 }
 
 table.cycle-metrics-table tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(168, 74, 50, 0.03);
 }
 
 .metric-name {
-  font-weight: 500;
-  color: #f1f5fa;
+  font-weight: 600;
+  color: #2b231d;
 }
 
 .metric-target {
-  color: #3dd6aa;
+  color: #806f61;
   font-family: monospace;
   white-space: nowrap;
 }
 
 .metric-measured {
   font-family: monospace;
-  font-weight: 600;
-  color: #ffffff;
+  font-weight: 700;
+  color: #2b231d;
   white-space: nowrap;
 }
 
@@ -971,22 +974,22 @@ table.cycle-metrics-table tr:hover td {
 }
 
 .badge-pill.match {
-  background: #0d3830;
-  color: #3dd6aa;
-  border: 1px solid #1c6657;
+  background: #edf6f0;
+  color: #236338;
+  border: 1px solid #b8dfc4;
 }
 
 .badge-pill.alert {
-  background: #3d1b1b;
-  color: #f77474;
-  border: 1px solid #6b2828;
+  background: #fcf0ec;
+  color: #a84a32;
+  border: 1px solid #f2c7bb;
 }
 
 /* Recommendations Box */
 .coach-recs-box {
-  background: #111a26;
-  border: 1px solid #203144;
-  border-radius: 8px;
+  background: #f4ecdf;
+  border: 1px solid #dfd1bd;
+  border-radius: 9px;
   padding: 14px 18px;
   margin: 16px 0 20px;
 }
@@ -994,8 +997,8 @@ table.cycle-metrics-table tr:hover td {
 .coach-recs-title {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 1px;
-  color: #3dd6aa;
+  letter-spacing: 1.1px;
+  color: #a84a32;
   text-transform: uppercase;
   margin-bottom: 8px;
 }
@@ -1004,7 +1007,7 @@ table.cycle-metrics-table tr:hover td {
   margin: 0;
   padding-left: 18px;
   font-size: 13px;
-  color: #c4d6ea;
+  color: #3b2e25;
   line-height: 1.55;
 }
 
@@ -1020,28 +1023,30 @@ table.cycle-metrics-table tr:hover td {
 }
 
 .btn-continue-cycle {
-  background: #2ac89b;
-  color: #08261e;
+  background: #a84a32;
+  color: #ffffff;
   border: none;
   font-weight: 700;
   font-size: 14px;
-  padding: 11px 20px;
+  padding: 11px 22px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s;
-  width: 100%;
+  transition: background 0.2s, transform 0.1s;
+  box-shadow: 0 3px 10px rgba(168, 74, 50, 0.2);
 }
 
 .btn-continue-cycle:hover {
-  background: #23ad86;
+  background: #8e3c26;
 }
 
 .cycle-modal-options {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
-  color: #7e95b2;
+  font-size: 12.5px;
+  color: #6d5f53;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .cycle-modal-options label {
@@ -1049,5 +1054,33 @@ table.cycle-metrics-table tr:hover td {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.btn-replay-audio {
+  background: #f0e6d6;
+  border: 1px solid #ded3c1;
+  color: #4e3f34;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.2s;
+}
+
+.btn-replay-audio:hover {
+  background: #e5d7c3;
+  color: #2b231d;
+}
+
+.voice-select-inline {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #ded3c1;
+  background: #fff;
+  font-size: 12px;
+  color: #2b231d;
 }
 

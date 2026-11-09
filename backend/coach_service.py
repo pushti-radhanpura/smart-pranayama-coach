@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import threading
 import numpy as np
+from scipy.signal import find_peaks
 
 import pranayama_dtw as dtw
 from pranayama_coach import LiveCoach
@@ -161,43 +162,99 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
     x = dtw.preprocess(t, v, fs=fs)
 
     ideal_cycle, bounds = dtw.aligned_cycle(p, fs)
-    spans = dtw.segment_cycles(x, fs, min_cycle_s=0.5 * p.cycle_s)
+
+    # 1. Genuine period and cycle duration detection from signal extrema
+    w = max(3, int(0.15 * fs))
+    xs = np.convolve(x, np.ones(w) / w, mode="same")
+    min_dist = max(3, int(0.25 * p.cycle_s * fs))
+    ptp_val = float(np.ptp(xs)) or 1.0
+    peaks, _ = find_peaks(xs, distance=min_dist, prominence=0.08 * ptp_val)
+    troughs, _ = find_peaks(-xs, distance=min_dist, prominence=0.08 * ptp_val)
+
+    spans = dtw.segment_cycles(x, fs, min_cycle_s=0.4 * p.cycle_s)
 
     if spans:
         a, b = spans[-1]
         cyc = x[a:b]
         cyc_dur = float((b - a) / fs)
-        cyc_res = dtw.analyse_cycle(cycle_num, a / fs, cyc, ideal_cycle, bounds, p, fs, 0.15)
-        dtw_score = float(cyc_res.score)
-        m_u = cyc_res.phases["user"]
-        measured_inh = float(m_u.get("inhale", p.inhale))
-        measured_hld = float(m_u.get("hold_in", p.hold_in))
-        measured_exh = float(m_u.get("exhale", p.exhale))
-        measured_hld_out = float(m_u.get("hold_out", p.hold_out))
+    elif len(peaks) >= 2:
+        cyc_dur = float((peaks[-1] - peaks[-2]) / fs)
+        cyc = xs[peaks[-2]:peaks[-1]]
+    elif len(troughs) >= 2:
+        cyc_dur = float((troughs[-1] - troughs[-2]) / fs)
+        cyc = xs[troughs[-2]:troughs[-1]]
+    elif len(peaks) >= 1 and len(troughs) >= 1:
+        cyc_dur = float(2.0 * abs(peaks[-1] - troughs[-1]) / fs)
+        n_pts = int(round(cyc_dur * fs))
+        cyc = xs[-n_pts:] if len(xs) >= n_pts else xs
     else:
-        n_samples = max(20, int(round(p.cycle_s * fs)))
-        cyc = x[-n_samples:] if len(x) >= n_samples else x
-        cyc_dur = float(len(cyc) / fs)
-        dtw_score = 78.0
-        measured_inh = float(p.inhale)
-        measured_hld = float(p.hold_in)
-        measured_exh = float(p.exhale)
-        measured_hld_out = float(p.hold_out)
+        cyc_dur = float(max(1.0, t[-1] - t[0]))
+        cyc = xs
 
-    measured_bpm = round(60.0 / cyc_dur, 1) if cyc_dur > 0 else round(60.0 / p.cycle_s, 1)
+    cyc_dur = float(np.clip(cyc_dur, 0.4, 60.0))
+    measured_bpm = round(60.0 / cyc_dur, 1)
     ideal_bpm = round(60.0 / p.cycle_s, 1)
 
+    # 2. Genuine phase measurements from the extracted cycle segment
+    lo_c, hi_c = float(np.min(cyc)), float(np.max(cyc))
+    rng_c = max(1e-4, hi_c - lo_c)
+    norm_c = (cyc - lo_c) / rng_c
+
+    hi_idx = np.where(norm_c >= 0.80)[0]
+    if len(hi_idx) > 0:
+        first_top = hi_idx[0]
+        dn_idx = np.where(norm_c[first_top:] < 0.75)[0]
+        last_top = first_top + dn_idx[0] if len(dn_idx) > 0 else len(norm_c) - 1
+        lo_idx = np.where(norm_c[last_top:] <= 0.20)[0]
+        first_bot = last_top + lo_idx[0] if len(lo_idx) > 0 else len(norm_c) - 1
+
+        measured_inh = float(max(0.5, first_top / fs))
+        measured_hld = float(max(0.0, (last_top - first_top) / fs))
+        measured_exh = float(max(0.5, (first_bot - last_top) / fs))
+        measured_hld_out = float(max(0.0, (len(norm_c) - 1 - first_bot) / fs))
+    else:
+        measured_inh = float(0.5 * cyc_dur)
+        measured_hld = 0.0
+        measured_exh = float(0.5 * cyc_dur)
+        measured_hld_out = 0.0
+
+    # 3. True Sakoe-Chiba DTW banded alignment
+    L = len(ideal_cycle)
+    if len(cyc) >= 4:
+        u = np.interp(np.linspace(0, len(cyc) - 1, L), np.arange(len(cyc)), cyc)
+        u_z = dtw.znorm(u)
+        ref_z = dtw.znorm(ideal_cycle)
+        radius = max(2, int(round(0.20 * L)))
+        d, pu, pi, _ = dtw.dtw_banded(u_z, ref_z, radius)
+        shape_score = 100.0 * np.exp(-d / 0.32)
+        tempo_ratio = cyc_dur / p.cycle_s
+        tempo_score = 100.0 * np.exp(-abs(np.log(max(0.2, tempo_ratio))) / 0.22)
+        dtw_score = float(np.clip(0.70 * shape_score + 0.30 * tempo_score, 15.0, 98.0))
+    else:
+        dtw_score = 75.0
+
+    score = round(dtw_score, 1)
+
+    # 4. Tidal volume & PEF calculation
+    amp = float(np.ptp(cyc)) if len(cyc) > 0 else 2.5
+    vt_ml = int(round(max(180.0, min(1400.0, (amp / 2.0) * 450.0))))
+    ideal_vt_str = "1100 mL" if p.cycle_s >= 6 else ("800 mL" if p.cycle_s >= 3 else "350 mL")
+
+    flow_diff = np.diff(cyc) * fs * 70.0 if len(cyc) > 1 else np.array([120.0])
+    pef = int(round(max(60.0, min(500.0, float(np.max(np.abs(flow_diff)))))))
+
+    # Ratio calculation
     inh_base = max(0.4, measured_inh)
     hld_ratio = round(measured_hld / inh_base, 2)
     exh_ratio = round(measured_exh / inh_base, 2)
     hld_out_ratio = round(measured_hld_out / inh_base, 2)
 
-    if p.hold_out > 0 or measured_hld_out > 0.5:
+    if p.hold_out > 0 or hld_out_ratio >= 0.3:
         measured_ratio_str = f"1 : {hld_ratio:.2f} : {exh_ratio:.2f} : {hld_out_ratio:.2f}"
     else:
         measured_ratio_str = f"1 : {hld_ratio:.2f} : {exh_ratio:.2f}"
 
-    id_inh = p.inhale
+    id_inh = max(0.1, p.inhale)
     id_hld = round(p.hold_in / id_inh, 2)
     id_exh = round(p.exhale / id_inh, 2)
     id_hld_out = round(p.hold_out / id_inh, 2)
@@ -206,18 +263,11 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
     else:
         ideal_ratio_str = f"1 : {id_hld:g} : {id_exh:g}"
 
-    amp = float(np.ptp(cyc)) if len(cyc) > 0 else 2.5
-    vt_ml = int(round(max(180.0, min(1200.0, (amp / 2.5) * 450.0))))
-    ideal_vt_str = "1100 mL" if p.cycle_s >= 6 else ("800 mL" if p.cycle_s >= 3 else "350 mL")
-
-    flow_diff = np.diff(cyc) * fs * 70.0 if len(cyc) > 1 else np.array([120.0])
-    pef = int(round(max(60.0, min(500.0, float(np.max(np.abs(flow_diff)))))))
-
-    score = round(dtw_score, 1)
+    # Performance Assessments
     if score >= 80:
         grade = "Grade A"
         score_assessment = "PASSED"
-        headline = "Well Done! Solid adherence and rhythm throughout the practice."
+        headline = "Well Done! Solid adherence and rhythm throughout the cycle."
     elif score >= 70:
         grade = "Grade B"
         score_assessment = "GOOD"
@@ -232,9 +282,9 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
         headline = "Needs practice. Align your breath closely with the circle animation."
 
     ratio_err = abs(exh_ratio - id_exh) + abs(hld_ratio - id_hld)
-    if ratio_err <= 0.35:
+    if ratio_err <= 0.40:
         ratio_assessment = "EXCELLENT MATCH"
-    elif ratio_err <= 0.75:
+    elif ratio_err <= 0.85:
         ratio_assessment = "GOOD MATCH"
     else:
         ratio_assessment = "OFF TARGET"
@@ -243,45 +293,59 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
     if bpm_diff <= 1.0:
         rate_assessment = "ON TARGET"
     elif measured_bpm > ideal_bpm:
-        rate_assessment = "SLIGHTLY FAST"
+        rate_assessment = "TOO FAST"
     else:
-        rate_assessment = "OFF TARGET"
+        rate_assessment = "TOO SLOW"
 
     vt_assessment = "GOOD DEPTH" if 250 <= vt_ml <= 850 else ("SHALLOW" if vt_ml < 250 else "DEEP")
     pef_assessment = "STABLE"
     endurance_assessment = "SUSTAINED"
 
+    # Actionable coaching recommendations
     recs = []
-    if measured_inh > p.inhale * 1.25:
-        recs.append(f"shorten your inhalation slightly to ~{p.inhale:g}s (currently {measured_inh:.1f}s)")
-    elif measured_inh < p.inhale * 0.75:
-        recs.append(f"lengthen your inhalation slightly to ~{p.inhale:g}s (currently {measured_inh:.1f}s)")
+    if measured_inh > p.inhale * 1.30:
+        recs.append(f"Shorten your inhalation slightly towards ~{p.inhale:g}s (currently {measured_inh:.1f}s).")
+    elif measured_inh < p.inhale * 0.70:
+        recs.append(f"Lengthen your inhalation gently towards ~{p.inhale:g}s (currently {measured_inh:.1f}s).")
 
-    if p.hold_in > 0 and measured_hld < p.hold_in * 0.75:
-        recs.append(f"maintain breath retention comfortably for ~{p.hold_in:g}s (currently {measured_hld:.1f}s)")
+    if p.hold_in > 0 and measured_hld < p.hold_in * 0.70:
+        recs.append(f"Maintain breath retention comfortably at the peak for ~{p.hold_in:g}s.")
 
-    if measured_exh < p.exhale * 0.8:
-        recs.append(f"extend your exhalation smoothly to ~{p.exhale:g}s (currently {measured_exh:.1f}s)")
-    elif measured_exh > p.exhale * 1.25:
-        recs.append(f"shorten your exhalation slightly to ~{p.exhale:g}s (currently {measured_exh:.1f}s)")
+    if measured_exh < p.exhale * 0.75:
+        recs.append(f"Extend your exhalation smoothly towards ~{p.exhale:g}s (currently {measured_exh:.1f}s).")
+    elif measured_exh > p.exhale * 1.35:
+        recs.append(f"Complete your exhalation a bit sooner towards ~{p.exhale:g}s.")
 
     if bpm_diff > 1.2:
         if measured_bpm < ideal_bpm:
-            recs.append(f"breathe slightly more briskly towards {ideal_bpm:g} BPM (currently {measured_bpm:g} BPM)")
+            recs.append(f"Breathe slightly more briskly towards {ideal_bpm:g} breaths per minute.")
         else:
-            recs.append(f"slow down your pace comfortably towards {ideal_bpm:g} BPM (currently {measured_bpm:g} BPM)")
+            recs.append(f"Slow down your pace comfortably towards {ideal_bpm:g} breaths per minute.")
 
     if p.cue and len(recs) < 2:
         recs.append(p.cue)
 
     if not recs:
-        recs.append("Maintain this exact calm rhythm for the upcoming cycles.")
+        recs.append("Maintain this exact calm rhythm and diaphragmatic focus.")
 
-    rec_spoken = recs[0].rstrip(".")
+    # Spoken natural human overview: NO colons, NO acronyms, NO parentheses!
+    import re
+    spoken_bpm = int(round(measured_bpm))
+    spoken_score = int(round(score))
+    primary_advice = recs[0].rstrip(".")
+    clean_spoken_advice = re.sub(r"\(currently\s*[^)]+\)", "", primary_advice)
+    clean_spoken_advice = re.sub(r"~(\d+(?:\.\d+)?)s\b", r"\1 seconds", clean_spoken_advice)
+    clean_spoken_advice = clean_spoken_advice.replace("~", "approximately ").strip(" .")
+
+    if p.hold_out > 0 or hld_out_ratio >= 0.3:
+        spoken_ratio = f"1 to {round(hld_ratio):g} to {round(exh_ratio):g} to {round(hld_out_ratio):g}"
+    else:
+        spoken_ratio = f"1 to {round(hld_ratio):g} to {round(exh_ratio):g}"
+
     spoken_text = (
-        f"Cycle {cycle_num} complete. Score {score:.0f} percent, {grade}. "
-        f"Measured ratio was {measured_ratio_str} at {measured_bpm:g} BPM. "
-        f"{rec_spoken}."
+        f"Cycle {cycle_num} complete. Overall score {spoken_score} percent, {grade}. "
+        f"Your breath ratio was {spoken_ratio}, at {spoken_bpm} breaths per minute. "
+        f"{clean_spoken_advice}."
     )
 
     total_session_s = int(round(t[-1])) if len(t) else int(round(cyc_dur * cycle_num))

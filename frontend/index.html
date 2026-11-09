@@ -70,17 +70,18 @@
     </div>
 
     <div class="cycle-modal-actions">
-      <div style="display:flex; gap:10px;">
-        <button class="btn-continue-cycle" id="cycleModalResumeBtn">Continue Next Cycle ▶</button>
-        <button class="outline" id="cycleModalActionBtn" style="color:#dbe4ef; border-color:#3a4f6a; padding:11px 20px; border-radius:8px; cursor:pointer;">Close & Return to Dashboard</button>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn-continue-cycle" id="cycleModalResumeBtn" style="flex:1;">Continue Next Cycle ▶</button>
+        <button class="outline" id="cycleModalActionBtn">Close & Return to Dashboard</button>
       </div>
       <div class="cycle-modal-options">
         <label>
           <input type="checkbox" id="autoReviewToggle" checked> Auto-review after each cycle
         </label>
         <label>
-          <input type="checkbox" id="cycleVoiceToggle" checked> Voice overview (en-IN)
+          <input type="checkbox" id="cycleVoiceToggle" checked> Spoken voice
         </label>
+        <button class="btn-replay-audio" id="replayVoiceBtn" type="button">🔊 Replay Voice</button>
       </div>
     </div>
   </dialog>
