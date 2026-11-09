@@ -402,6 +402,7 @@
       apiBase: API_BASE,
       pattern: selected.id,
       voice: voiceEnabled,
+      mode: sessionMode,
       onMessage: (verdict) => {
         const box = document.getElementById("feedbackBox");
         const titleEl = document.getElementById("feedbackTitle");
@@ -580,6 +581,7 @@
     const inputSelect = document.getElementById("inputSourceSelect");
     inputSelect.addEventListener("change", (e) => {
       sessionMode = e.target.value;
+      if (coachClient) coachClient.mode = sessionMode;
       document.getElementById("modeLabel").textContent =
         sessionMode === "reference" ? "Reference" : sessionMode === "sensor_replay" ? "LTspice Replay" : "Simulated";
       if (sessionMode === "sim_good") simGenerator = PranayamaCoach.demoSignal(patObj, "good");
@@ -946,7 +948,7 @@
       let rev = null;
       if (coachClient && userWaveHistory.length >= 5) {
         try {
-          rev = await coachClient.cycleReview(cycleNum);
+          rev = await coachClient.cycleReview(cycleNum, sessionMode);
         } catch (e) {
           console.warn("Backend cycle review failed, falling back to local analysis:", e);
         }
@@ -1142,7 +1144,7 @@
     try {
       let fin = null;
       if (coachClient) {
-        fin = await coachClient.finish();
+        fin = await coachClient.finish(sessionMode);
       }
       if (!fin || typeof fin === "string") {
         const dur = Math.round(currentTime()) || 15;

@@ -185,6 +185,7 @@ class Chunk(BaseModel):
     t: list[float]               # seconds since the guide started
     values: list[float]          # breath signal (volume-like: goes UP while inhaling)
     guided: bool = True
+    mode: str | None = None
 
 
 class CompareRequest(BaseModel):
@@ -198,6 +199,7 @@ class CycleReviewRequest(BaseModel):
     cycle_num: int
     t: list[float]
     values: list[float]
+    mode: str | None = None
 
 
 def _run(fn, *args, **kwargs):
@@ -226,12 +228,12 @@ def patterns():
 
 @app.post("/evaluate")
 def evaluate(c: Chunk):
-    return _run(svc.evaluate_chunk, c.session_id, c.pattern, c.t, c.values, c.guided)
+    return _run(svc.evaluate_chunk, c.session_id, c.pattern, c.t, c.values, c.guided, c.mode)
 
 
 @app.post("/finish")
 async def finish(c: Chunk):
-    res = await run_in_threadpool(svc.finish_session, c.session_id, c.pattern, c.t, c.values)
+    res = await run_in_threadpool(svc.finish_session, c.session_id, c.pattern, c.t, c.values, c.mode)
     if isinstance(res, dict) and res.get("spoken_text"):
         asyncio.create_task(synthesize_speech(res["spoken_text"], "en-IN-NeerjaNeural"))
     return res
@@ -245,7 +247,7 @@ def compare(req: CompareRequest):
 @app.post("/cycle-review")
 @app.post("/cycle_review")
 async def cycle_review(req: CycleReviewRequest):
-    res = await run_in_threadpool(svc.cycle_review, req.pattern, req.cycle_num, req.t, req.values)
+    res = await run_in_threadpool(svc.cycle_review, req.pattern, req.cycle_num, req.t, req.values, req.mode)
     if isinstance(res, dict) and res.get("spoken_text"):
         asyncio.create_task(synthesize_speech(res["spoken_text"], "en-IN-NeerjaNeural"))
     return res

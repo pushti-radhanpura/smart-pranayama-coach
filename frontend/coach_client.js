@@ -40,6 +40,7 @@
       this.guided = options.guided !== false; // true = locked to guide clock
       this.checkEverySec = options.checkEverySec || 10;
       this.sessionId = options.sessionId || makeId();
+      this.mode = options.mode || "sim_good";
 
       this.onMessage = options.onMessage || function () {};
       this.onStop = options.onStop || function () {};
@@ -173,6 +174,7 @@
           session_id: this.sessionId,
           pattern: this.pattern,
           guided: this.guided,
+          mode: this.mode,
           t: this.t,
           values: this.v.map((x) => +x.toFixed(4)),
         };
@@ -204,13 +206,14 @@
     /**
      * Complete the session and retrieve final verbal feedback and score review.
      */
-    async finish() {
+    async finish(modeOverride = null) {
       this.stopped = true;
       if (this.t.length < 5) return null;
       try {
         const payload = {
           session_id: this.sessionId,
           pattern: this.pattern,
+          mode: modeOverride || this.mode,
           t: this.t,
           values: this.v.map((x) => +x.toFixed(4)),
         };
@@ -243,11 +246,12 @@
     /**
      * Request clinical per-cycle respiration metrics review and verbal overview.
      */
-    async cycleReview(cycleNum) {
+    async cycleReview(cycleNum, modeOverride = null) {
       if (this.t.length < 5) return null;
       const payload = {
         pattern: this.pattern,
         cycle_num: cycleNum,
+        mode: modeOverride || this.mode,
         t: this.t,
         values: this.v.map((x) => +x.toFixed(4)),
       };

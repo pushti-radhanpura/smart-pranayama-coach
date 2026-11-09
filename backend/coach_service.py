@@ -59,8 +59,34 @@ def _check(pattern: str, t, values):
     return t, v
 
 
-def evaluate_chunk(session_id: str, pattern: str, t, values, guided: bool = True) -> dict:
+def evaluate_chunk(session_id: str, pattern: str, t, values, guided: bool = True, mode: str | None = None) -> dict:
     t, v = _check(pattern, t, values)
+    p = dtw.PATTERNS[pattern]
+    if mode == "sim_good":
+        return {
+            "status": "excellent",
+            "message": f"Wonderful! You are following the {p.name} pattern with smooth control.",
+            "speak": False,
+            "stop_session": False,
+            "score": 92.0,
+        }
+    elif mode == "sim_small":
+        return {
+            "status": "drifting",
+            "message": f"Timing irregularities detected in your breath hold and pace. Align steadily with the circle.",
+            "speak": False,
+            "stop_session": False,
+            "score": 62.0,
+        }
+    elif mode == "sim_wrong":
+        return {
+            "status": "stop",
+            "message": f"I am sorry to interrupt. Your breathing is quite different from the {p.name} pattern, so let us pause here. Please reset and follow the guide from the start.",
+            "speak": True,
+            "stop_session": True,
+            "score": 25.0,
+        }
+
     with _lock:
         held = _sessions.get(session_id)
         if held is None or held[0] != pattern:
@@ -78,7 +104,7 @@ def evaluate_chunk(session_id: str, pattern: str, t, values, guided: bool = True
     }
 
 
-def finish_session(session_id: str, pattern: str, t, values) -> dict:
+def finish_session(session_id: str, pattern: str, t, values, mode: str | None = None) -> dict:
     """Comprehensive end-of-session evaluation across all completed breath cycles."""
     if t is not None and values is not None and 5 <= len(t) < 20:
         step = (t[-1] - t[0]) / max(1, len(t) - 1) if len(t) > 1 else 0.1
@@ -153,7 +179,33 @@ def finish_session(session_id: str, pattern: str, t, values) -> dict:
         if held and hasattr(held[1], "_last_status") and held[1]._last_status == "stop":
             was_stopped = True
 
-    if was_stopped or corr_guide < 0.2:
+    if mode == "sim_good":
+        session_score = 88.0
+        grade = "Grade A"
+        headline = "Session Completed with Mastery!"
+        review_text = (
+            f"You completed {n_cycles} breath cycles of {p.name} across {duration_s} seconds with excellent rhythm. "
+            f"Overall session mastery score was {session_score}/100 ({grade})."
+        )
+        spoken_text = "Session complete! Outstanding practice with solid rhythm and mastery. Great work!"
+        recs = [
+            "Your pacing and breath alignment were excellent throughout.",
+            p.cue if p.cue else "Maintain this regular daily rhythm for best respiratory benefits."
+        ]
+    elif mode == "sim_small":
+        session_score = 64.0
+        grade = "Grade C"
+        headline = "Session Completed with Timing Irregularities"
+        review_text = (
+            f"You completed {n_cycles} breath cycles of {p.name} across {duration_s} seconds. "
+            f"Timing irregularities detected (Score: {session_score}/100, {grade})."
+        )
+        spoken_text = "Session complete. Timing irregularities were detected during your practice. Focus on pacing each breath steadily with the guide in your next session."
+        recs = [
+            "Timing inconsistencies were detected across your breath cycles.",
+            "Focus on matching the circle expansion and contraction steadily."
+        ]
+    elif mode == "sim_wrong" or was_stopped or corr_guide < 0.2:
         session_score = round(float(np.clip(25.0 + 15.0 * max(-1.0, corr_guide), 18.0, 45.0)), 1)
         grade = "Grade D"
         headline = "Session Interrupted — Severe Timing Deviation"
@@ -167,7 +219,7 @@ def finish_session(session_id: str, pattern: str, t, values) -> dict:
             "Your breathing was inverted or completely out of phase with the visual guide.",
             "Take a moment to relax, reset, and follow the circle expansion and contraction from the start."
         ]
-    elif corr_guide < 0.50 or mean_ratio_err >= 0.20 or any(sc < 78 for sc in scores) or tempo_ratio < 0.88 or tempo_ratio > 1.12:
+    elif corr_guide < 0.50 or mean_ratio_err >= 0.25 or any(sc < 78 for sc in scores) or tempo_ratio < 0.88 or tempo_ratio > 1.12:
         raw_s = min(float(S.get("session_score", 70.0)), float(np.mean(scores)) if scores else 70.0)
         session_score = round(float(np.clip(raw_s * 0.78, 54.0, 68.0)), 1)
         grade = "Grade C" if session_score < 65 else "Grade B"
@@ -274,7 +326,7 @@ def compare_session(pattern: str, t, values) -> dict:
     }
 
 
-def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
+def cycle_review(pattern: str, cycle_num: int, t, values, mode: str | None = None) -> dict:
     """Detailed per-cycle respiration parameter review and verbal overview matching clinical metrics."""
     if t is not None and values is not None and 5 <= len(t) < 20:
         step = (t[-1] - t[0]) / max(1, len(t) - 1) if len(t) > 1 else 0.1
@@ -392,7 +444,37 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
     ratio_err = abs(exh_ratio - id_exh) + abs(hld_ratio - id_hld) + abs(hld_out_ratio - id_hld_out)
 
     # Performance Assessments & Calibration
-    if corr_guide < 0.2:
+    if mode == "sim_good":
+        score = 90.0
+        grade = "Grade A"
+        score_assessment = "PASSED"
+        headline = "Well Done! Solid adherence and rhythm throughout the cycle."
+        ratio_assessment = "EXCELLENT MATCH"
+        rate_assessment = "ON TARGET"
+        vt_assessment = "GOOD DEPTH"
+        pef_assessment = "STABLE"
+        endurance_assessment = "SUSTAINED"
+        spoken_text = "Cycle complete. Grade A, excellent rhythm. Maintain this calm diaphragmatic focus."
+        recs = [
+            "Maintain this exact calm rhythm and diaphragmatic focus.",
+            p.cue if p.cue else "Keep shoulders relaxed and posture upright."
+        ]
+    elif mode == "sim_small":
+        score = 62.0
+        grade = "Grade C"
+        score_assessment = "FAIR"
+        headline = "Timing Irregularities Detected — Inconsistent Rhythm"
+        ratio_assessment = "OFF TARGET"
+        rate_assessment = "VARIABLE"
+        vt_assessment = "GOOD DEPTH"
+        pef_assessment = "STABLE"
+        endurance_assessment = "SUSTAINED"
+        spoken_text = "Timing irregularities detected. Your breathing drifted off rhythm. Focus on pacing each phase steadily with the circle."
+        recs = [
+            f"Breath ratio was inconsistent ({measured_ratio_str} vs ideal {ideal_ratio_str}).",
+            "Maintain smooth, even transitions between inhalation and exhalation without lingering."
+        ]
+    elif mode == "sim_wrong" or corr_guide < 0.2:
         # Out of phase / reversed breathing
         score = round(float(np.clip(25.0 + 15.0 * max(-1.0, corr_guide), 18.0, 45.0)), 1)
         grade = "Grade D"
@@ -400,12 +482,15 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
         headline = "Critical Timing Deviation: Breathing Out of Phase with Guide"
         ratio_assessment = "CRITICAL DESYNC"
         rate_assessment = "OFF TARGET"
+        vt_assessment = "SHALLOW"
+        pef_assessment = "ERRATIC"
+        endurance_assessment = "DESYNC"
         spoken_text = "Needs practice. Critical timing deviation detected. Your breath is out of phase with the guide. Please synchronize with the visual circle."
         recs = [
             "Your breathing is completely inverted or out of sync with the visual circle guide.",
             "Inhale when the circle expands, and exhale smoothly when the circle contracts."
         ]
-    elif corr_guide < 0.50 or ratio_err > 0.18 or dtw_score < 78.0:
+    elif corr_guide < 0.50 or ratio_err > 0.30 or dtw_score < 70.0:
         # Small mistakes / timing irregularities / ratio drift
         score = round(float(np.clip(min(dtw_score, 68.0), 55.0, 68.0)), 1)
         grade = "Grade C" if score < 65 else "Grade B"
@@ -413,6 +498,9 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
         headline = "Timing Irregularities Detected — Inconsistent Rhythm"
         ratio_assessment = "OFF TARGET" if ratio_err > 0.35 else "GOOD MATCH"
         rate_assessment = "ON TARGET" if abs(measured_bpm - ideal_bpm) <= 1.0 else ("TOO FAST" if measured_bpm > ideal_bpm else "TOO SLOW")
+        vt_assessment = "GOOD DEPTH" if 250 <= vt_ml <= 850 else ("SHALLOW" if vt_ml < 250 else "DEEP")
+        pef_assessment = "STABLE"
+        endurance_assessment = "SUSTAINED"
         spoken_text = "Timing irregularities detected. Your breathing drifted off rhythm. Focus on pacing each phase steadily with the circle."
         recs = [
             f"Breath ratio was inconsistent ({measured_ratio_str} vs ideal {ideal_ratio_str}).",
@@ -426,6 +514,9 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
         headline = "Well Done! Solid adherence and rhythm throughout the cycle."
         ratio_assessment = "EXCELLENT MATCH"
         rate_assessment = "ON TARGET"
+        vt_assessment = "GOOD DEPTH" if 250 <= vt_ml <= 850 else ("SHALLOW" if vt_ml < 250 else "DEEP")
+        pef_assessment = "STABLE"
+        endurance_assessment = "SUSTAINED"
         spoken_text = "Cycle complete. Grade A, excellent rhythm. Maintain this calm diaphragmatic focus."
         recs = [
             "Maintain this exact calm rhythm and diaphragmatic focus.",
@@ -433,10 +524,6 @@ def cycle_review(pattern: str, cycle_num: int, t, values) -> dict:
         ]
 
     bpm_diff = abs(measured_bpm - ideal_bpm)
-    vt_assessment = "GOOD DEPTH" if 250 <= vt_ml <= 850 else ("SHALLOW" if vt_ml < 250 else "DEEP")
-    pef_assessment = "STABLE"
-    endurance_assessment = "SUSTAINED"
-
     total_session_s = int(round(t[-1])) if len(t) else int(round(cyc_dur * cycle_num))
     import urllib.parse
 
