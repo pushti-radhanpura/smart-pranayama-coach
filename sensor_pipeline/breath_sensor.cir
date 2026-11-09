@@ -1,0 +1,11 @@
+* Capacitive breath sensor - RC divider with time-varying capacitor
+V1 in 0 SINE(0 5 10000)
+R1 in out 1Meg
+* V2 carries the capacitance in pF as a plain number
+V2 cap 0 PWL file=cap_pwl.txt
+* B1 behaves as a capacitor C(t): i = d(C*v)/dt
+B1 out 0 I=ddt(V(cap)*1e-12*V(out))
+.tran 0 1.171700 0 2u
+.save V(out)
+.options plotwinsize=0 method=trap
+.end

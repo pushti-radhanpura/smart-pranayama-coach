@@ -1,0 +1,70 @@
+{
+  "_readme": [
+    "Each block below is one pranayama. Durations are in seconds.",
+    "To use your teammate's curve file instead of the built-in shape, add: \"curve_file\": \"curves/box.csv\"",
+    "Optional with a curve file: \"curve_fs\": 10 (samples/second, ONLY for one-column files), \"cycles_in_file\": 3 (if the file holds 3 breath cycles).",
+    "With a curve file you may delete inhale/hold_in/exhale/hold_out - they are measured from the curve automatically.",
+    "Keys starting with an underscore (like this one) are ignored."
+  ],
+  "bhastrika": {
+    "name": "Bhastrika (Bellows Breath)",
+    "curve_file": "curves/bhastrika.py",
+    "cue": "Keep inhalation and exhalation equal and rhythmic.",
+    "eyes_closed": false
+  },
+  "kapalabhati": {
+    "name": "Kapalabhati (Skull-Shining Breath)",
+    "curve_file": "curves/kapalabhati.csv",
+    "cycles_in_file": 10,
+    "cue": "Let the inhale be passive and the exhale short and sharp.",
+    "eyes_closed": false
+  },
+  "nadi_shodhana": {
+    "name": "Nadi Shodhana (Alternate Nostril Breathing)",
+    "curve_file": "curves/nadi_shodhana.py",
+    "cue": "Block your right nostril to inhale through the left, switch to block the left nostril and exhale through the right, then repeat starting from the right side.",
+    "eyes_closed": true
+  },
+  "anuloma_viloma": {
+    "name": "Anuloma Viloma (Alternate Nostril Flow)",
+    "curve_file": "curves/anuloma_viloma.py",
+    "cue": "Let the exhalation be twice as long as inhalation.",
+    "eyes_closed": true
+  },
+  "bhramari": {
+    "name": "Bhramari (Humming Bee Breath)",
+    "curve_file": "curves/bhramari.py",
+    "cue": "Keep the humming sound steady throughout the exhalation.",
+    "eyes_closed": true
+  },
+  "ujjayi": {
+    "name": "Ujjayi (Ocean Breath)",
+    "curve_file": "curves/ujjayi.py",
+    "cue": "Keep the soft ocean-like sound smooth and even.",
+    "eyes_closed": true
+  },
+  "sama_vritti": {
+    "name": "Sama Vritti (Box Breathing)",
+    "curve_file": "curves/sama_vritti.py",
+    "cue": "Keep all four parts of the breath exactly equal.",
+    "eyes_closed": true
+  },
+  "sheetali": {
+    "name": "Sheetali (Cooling Breath)",
+    "curve_file": "curves/sheetali.py",
+    "cue": "Inhale slowly and smoothly, then exhale gently through the nose.",
+    "eyes_closed": true
+  },
+  "sheetkari": {
+    "name": "Sheetkari (Hissing Breath)",
+    "curve_file": "curves/sheetkari.py",
+    "cue": "Press your teeth together with lips parted, draw the air in smoothly through the crevices of your teeth with a hiss, and exhale slowly through both nostrils.",
+    "eyes_closed": true
+  },
+  "surya_bhedana": {
+    "name": "Surya Bhedana (Right Nostril Breath)",
+    "curve_file": "curves/surya_bhedana.py",
+    "cue": "Keep the breath slow and comfortable.",
+    "eyes_closed": true
+  }
+}

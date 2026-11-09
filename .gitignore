@@ -1,0 +1,29 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# Environment Variables
+.env
+.env.local
+
+# OS Generated
+.DS_Store
+Thumbs.db
+
+# Simulation temporary / raw outputs
+*.raw
+*.op.raw
+*.log
+
+# IDEs
+.vscode/
+.idea/

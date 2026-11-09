@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Pranayama Breathing Coach — Mindful Breathing & DTW Feedback</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#home">
+      <span class="lotus">♧</span> Smart Pranayama Coach
+    </a>
+    <nav>
+      <a href="#home">Home</a>
+      <a href="#pranayamas">Pranayamas</a>
+      <a href="#sensor">Sensor Analysis</a>
+      <a href="#about">About</a>
+    </nav>
+    <div class="account">
+      <button class="outline small" id="loginBtn">Login</button>
+      <button class="primary small" id="signupBtn">Sign Up</button>
+    </div>
+  </header>
+
+  <main id="app"></main>
+
+  <footer>
+    <span>Smart Pranayama Breathing Coach</span>
+    <span>Ancient breathing traditions · Sakoe-Chiba DTW feedback · Capacitive sensor pipeline</span>
+    <span>Educational prototype — not medical advice</span>
+  </footer>
+
+  <dialog id="authDialog">
+    <form method="dialog" class="authbox">
+      <button class="close" value="cancel" aria-label="Close">×</button>
+      <h2 id="authTitle">Welcome back</h2>
+      <p>Save your practice sessions on this device.</p>
+      <label>Your name
+        <input id="userName" placeholder="Enter your name" required maxlength="40">
+      </label>
+      <button id="authSubmit" class="primary" value="ok">Continue</button>
+      <p class="fine">Demo login only — no password or server account.</p>
+    </form>
+  </dialog>
+
+  <!-- Coach client loaded BEFORE app.js as required -->
+  <script src="coach_client.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
